@@ -22,6 +22,13 @@
       "when": 1790506020481,
       "tag": "0002_bright_nebula",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790516332143,
+      "tag": "0003_young_toad",
+      "breakpoints": true
     }
   ]
 }
