@@ -15,6 +15,13 @@
       "when": 1790505287731,
       "tag": "0001_illegal_squadron_supreme",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790506020481,
+      "tag": "0002_bright_nebula",
+      "breakpoints": true
     }
   ]
 }
