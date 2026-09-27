@@ -29,6 +29,13 @@
       "when": 1790516332143,
       "tag": "0003_young_toad",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790523856528,
+      "tag": "0004_condemned_daimon_hellstrom",
+      "breakpoints": true
     }
   ]
 }
