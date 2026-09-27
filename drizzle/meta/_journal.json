@@ -8,6 +8,13 @@
       "when": 1790503141146,
       "tag": "0000_lucky_joseph",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790505287731,
+      "tag": "0001_illegal_squadron_supreme",
+      "breakpoints": true
     }
   ]
 }
