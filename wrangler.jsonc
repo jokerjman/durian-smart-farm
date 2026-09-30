@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "durian-smart-farm",
+  "main": "./dist/server/index.js",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "no_bundle": true,
+  "assets": { "directory": "./dist/client" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "durian-smart-farm-db",
+      "database_id": "3896ae7c-d323-4ba8-980d-5885eeefcf77",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "observability": { "enabled": true }
+}

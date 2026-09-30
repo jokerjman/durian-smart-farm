@@ -1,0 +1,3 @@
+import {env} from "cloudflare:workers";import {assertSameOrigin,clearSessionCookie,now} from "@/lib/authz";import {hashToken} from "@/lib/password";
+function token(raw:string){for(const p of raw.split(";")){const [k,...v]=p.trim().split("=");if(k==="durian_session")return decodeURIComponent(v.join("="))}return null}
+export async function POST(req:Request){try{assertSameOrigin(req);const value=token(req.headers.get("cookie")||"");if(value)await env.DB!.prepare("UPDATE app_sessions SET revoked_at=? WHERE token_hash=?").bind(now(),await hashToken(value)).run();return Response.json({saved:true},{headers:{"Set-Cookie":clearSessionCookie(req)}})}catch(e){return e instanceof Response?e:Response.json({error:"ออกจากระบบไม่สำเร็จ"},{status:500})}}

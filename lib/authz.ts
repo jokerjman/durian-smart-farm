@@ -1,26 +1,11 @@
-import { env } from "cloudflare:workers";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
-
-export type Session = { userId:string; email:string; name:string; farmId:string; role:string };
-const now=()=>Math.floor(Date.now()/1000);
-const id=(prefix:string)=>`${prefix}_${crypto.randomUUID()}`;
-
-export async function requireSession():Promise<Session>{
-  const auth=await getChatGPTUser();
-  if(!auth) throw new Response("กรุณาเข้าสู่ระบบ",{status:401});
-  if(!env.DB) throw new Response("ฐานข้อมูลยังไม่พร้อม",{status:503});
-  const db=env.DB, ts=now();
-  await db.prepare("INSERT INTO users (id,name,email,created_at,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,email=excluded.email,updated_at=excluded.updated_at").bind(auth.userId,auth.displayName,auth.email,ts,ts).run();
-  let member=await db.prepare("SELECT fm.farm_id AS farmId,fm.role AS role FROM farm_members fm WHERE fm.user_id=? AND fm.status='active' LIMIT 1").bind(auth.userId).first<{farmId:string;role:string}>();
-  if(!member){
-    const farmId=id("farm"),memberId=id("member");
-    await db.batch([
-      db.prepare("INSERT INTO farms (id,owner_id,name,address,area_rai,created_at,updated_at) VALUES (?,?,?,?,?,?,?)").bind(farmId,auth.userId,"สวนศรีจันทร์","จันทบุรี",24,ts,ts),
-      db.prepare("INSERT INTO farm_members (id,farm_id,user_id,role,plot_scope_id,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)").bind(memberId,farmId,auth.userId,"owner",null,"active",ts,ts),
-    ]); member={farmId,role:"owner"};
-  }
-  return {userId:auth.userId,email:auth.email,name:auth.displayName,farmId:member.farmId,role:member.role};
-}
-export function permit(session:Session,roles:string[]){if(!roles.includes(session.role))throw new Response("ไม่มีสิทธิ์ดำเนินการ",{status:403})}
+import {env} from "cloudflare:workers";import {headers} from "next/headers";import {hashToken,randomToken} from "@/lib/password";
+export type Session={userId:string;username:string;name:string;farmId:string;role:string;permissions:string[];mustChangePassword:boolean};
+export const now=()=>Math.floor(Date.now()/1000);export const id=(prefix:string)=>`${prefix}_${crypto.randomUUID()}`;
+function cookieValue(raw:string,name:string){for(const part of raw.split(";")){const [key,...rest]=part.trim().split("=");if(key===name)return decodeURIComponent(rest.join("="))}return null}
+export async function requireSession():Promise<Session>{if(!env.DB)throw new Response("ฐานข้อมูลยังไม่พร้อม",{status:503});const h=await headers(),token=cookieValue(h.get("cookie")||"","durian_session");if(!token)throw new Response("กรุณาเข้าสู่ระบบ",{status:401});const tokenHash=await hashToken(token),ts=now();const row=await env.DB.prepare("SELECT s.id AS sessionId,s.user_id AS userId,a.username AS username,u.name AS name,a.must_change_password AS mustChangePassword,fm.farm_id AS farmId,fm.role AS role FROM app_sessions s JOIN local_accounts a ON a.user_id=s.user_id JOIN users u ON u.id=s.user_id JOIN farm_members fm ON fm.user_id=s.user_id AND fm.status='active' WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>? AND a.is_active=1 LIMIT 1").bind(tokenHash,ts).first<{sessionId:string;userId:string;username:string;name:string;mustChangePassword:number;farmId:string;role:string}>();if(!row)throw new Response("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่",{status:401});const permissions=row.role==="admin"?["*"]:((await env.DB.prepare("SELECT permission_key FROM user_permissions WHERE farm_id=? AND user_id=? AND allowed=1").bind(row.farmId,row.userId).all<{permission_key:string}>()).results||[]).map(x=>x.permission_key);await env.DB.prepare("UPDATE app_sessions SET last_seen_at=? WHERE id=?").bind(ts,row.sessionId).run();return {userId:row.userId,username:row.username,name:row.name,farmId:row.farmId,role:row.role,permissions,mustChangePassword:!!row.mustChangePassword}}
+export function permit(s:Session,roles:string[]){if(s.role!=="admin"&&!roles.includes(s.role))throw new Response("ไม่มีสิทธิ์ดำเนินการ",{status:403})}
+export function permitPermission(s:Session,key:string){if(s.role!=="admin"&&!s.permissions.includes("*")&&!s.permissions.includes(key))throw new Response("ไม่มีสิทธิ์ดำเนินการ",{status:403})}
+export async function createSession(userId:string,request:Request){const token=randomToken(),ts=now(),sessionId=id("session");await env.DB!.prepare("INSERT INTO app_sessions (id,user_id,token_hash,expires_at,last_seen_at,revoked_at,created_at) VALUES (?,?,?,?,?,?,?)").bind(sessionId,userId,await hashToken(token),ts+28800,ts,null,ts).run();const secure=new URL(request.url).protocol==="https:"?"; Secure":"";return {token,header:`durian_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800${secure}`}}
+export function clearSessionCookie(request:Request){const secure=new URL(request.url).protocol==="https:"?"; Secure":"";return `durian_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure}`}
+export function assertSameOrigin(request:Request){const origin=request.headers.get("origin");if(origin&&origin!==new URL(request.url).origin)throw new Response("คำขอไม่ถูกต้อง",{status:403})}
 export async function audit(s:Session,action:string,entityType:string,entityId:string,detail:unknown){if(!env.DB)return;await env.DB.prepare("INSERT INTO audit_logs (id,farm_id,actor_id,action,entity_type,entity_id,detail_json,created_at) VALUES (?,?,?,?,?,?,?,?)").bind(id("audit"),s.farmId,s.userId,action,entityType,entityId,JSON.stringify(detail),now()).run()}
-export {id,now};

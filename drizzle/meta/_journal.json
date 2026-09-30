@@ -36,6 +36,13 @@
       "when": 1790523856528,
       "tag": "0004_condemned_daimon_hellstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790786506017,
+      "tag": "0005_tiny_harrier",
+      "breakpoints": true
     }
   ]
 }

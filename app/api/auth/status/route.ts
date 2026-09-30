@@ -1,0 +1,3 @@
+import {env} from "cloudflare:workers";import {requireSession} from "@/lib/authz";
+export const dynamic="force-dynamic";
+export async function GET(){try{const row=await env.DB!.prepare("SELECT COUNT(*) AS count FROM local_accounts WHERE is_active=1").first<{count:number}>();if(!Number(row?.count))return Response.json({setupRequired:true,session:null});try{return Response.json({setupRequired:false,session:await requireSession()})}catch(e){if(e instanceof Response&&e.status===401)return Response.json({setupRequired:false,session:null});throw e}}catch{return Response.json({error:"ไม่สามารถตรวจสอบระบบผู้ใช้ได้"},{status:500})}}
