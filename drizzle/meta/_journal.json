@@ -43,6 +43,13 @@
       "when": 1790786506017,
       "tag": "0005_tiny_harrier",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790819695793,
+      "tag": "0006_sour_molecule_man",
+      "breakpoints": true
     }
   ]
 }

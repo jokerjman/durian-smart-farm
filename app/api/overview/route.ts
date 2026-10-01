@@ -27,6 +27,7 @@ export async function GET(){
   const month=new Date().toISOString().slice(0,7);
   const money=await env.DB!.prepare("SELECT COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END),0) AS income,COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) AS expense FROM transactions WHERE farm_id=? AND substr(occurred_on,1,7)=?").bind(farmId,month).first<{income:number;expense:number}>();
   const productCount=await env.DB!.prepare("SELECT COUNT(*) AS count FROM products WHERE farm_id=? AND active=1").bind(farmId).first<{count:number}>();
-  return Response.json({farms,selectedFarmId:farmId,season,summary:{treeCount:selected.treeCount,openTaskCount:Number(taskCount?.count||0),income:Number(money?.income||0),expense:Number(money?.expense||0),productCount:Number(productCount?.count||0)},tasks:tasks.results||[]});
+  const branding=await env.DB!.prepare("SELECT site_name AS siteName,mascot_name AS mascotName FROM farm_settings WHERE farm_id=? LIMIT 1").bind(farmId).first<{siteName:string;mascotName:string}>();
+  return Response.json({farms,selectedFarmId:farmId,branding:branding||{siteName:"Durian Smart Farm",mascotName:"น้องทุเรียน"},season,summary:{treeCount:selected.treeCount,openTaskCount:Number(taskCount?.count||0),income:Number(money?.income||0),expense:Number(money?.expense||0),productCount:Number(productCount?.count||0)},tasks:tasks.results||[]});
  }catch(e){return e instanceof Response?e:Response.json({error:"โหลดข้อมูลภาพรวมไม่สำเร็จ"},{status:500})}
 }
