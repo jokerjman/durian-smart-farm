@@ -50,6 +50,13 @@
       "when": 1790819695793,
       "tag": "0006_sour_molecule_man",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790820602010,
+      "tag": "0007_noisy_madame_web",
+      "breakpoints": true
     }
   ]
 }
