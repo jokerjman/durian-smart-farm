@@ -7,6 +7,7 @@ import {FarmsPlotsPage,TreesPage as RegistryTreesPage} from "./p2-pages";
 import {SeasonsPage} from "./p3-pages";
 import {WorkCalendarPage} from "./p4-pages";
 import {FinancePage,InventoryPage} from "./p5-pages";
+import {HarvestPage} from "./p6-pages";
 
 type Session={userId:string;username:string;name:string;farmId:string;role:string;permissions:string[];mustChangePassword:boolean};
 type Farm={id:string;name:string;address:string|null;areaRai:number|null;plotCount:number;treeCount:number};
@@ -32,9 +33,10 @@ export default function LiveApp({session}:{session:Session}){
   if(tab==="work")return <WorkCalendarPage refreshOverview={load}/>;
   if(tab==="stock")return <InventoryPage refreshOverview={load}/>;
   if(tab==="money")return <FinancePage refreshOverview={load}/>;
+  if(tab==="harvest")return <HarvestPage refreshOverview={load}/>;
   if(tab==="users")return <UsersPage/>;
   if(tab==="settings")return <SettingsPage saved={load}/>;
-  const copy:Record<Exclude<Tab,"today"|"farms"|"trees"|"work"|"season"|"money"|"stock"|"users"|"settings">,[string,string,string]>={smart:["สวนอัจฉริยะ","ยังไม่มีข้อมูลเฝ้าระวัง","ข้อมูลอากาศ สุขภาพต้น และเซนเซอร์จะเชื่อมใน P7"],harvest:["ผลผลิต & การขาย","ยังไม่มีรุ่นเก็บเกี่ยว","การเก็บเกี่ยว คัดเกรด ขาย และตรวจสอบย้อนกลับจะจัดทำใน P6"],report:["วิเคราะห์ & GAP","ยังไม่มีข้อมูลเพียงพอสำหรับรายงาน","รายงานจะคำนวณจากข้อมูลจริงและประวัติฤดูใน P8"]};
+  const copy:Record<Exclude<Tab,"today"|"farms"|"trees"|"work"|"season"|"harvest"|"money"|"stock"|"users"|"settings">,[string,string,string]>={smart:["สวนอัจฉริยะ","ยังไม่มีข้อมูลเฝ้าระวัง","ข้อมูลอากาศ สุขภาพต้น และเซนเซอร์จะเชื่อมใน P7"],report:["วิเคราะห์ & GAP","ยังไม่มีข้อมูลเพียงพอสำหรับรายงาน","รายงานจะคำนวณจากข้อมูลจริงและประวัติฤดูใน P8"]};
   const [title,headline,detail]=copy[tab];return <EmptyPage title={title} headline={headline} detail={detail}/>;
  },[tab,data,farm,session]);
  return <div className="shell live-shell"><aside><button className="brand" onClick={()=>setTab("today")}><b><Leaf/></b><span><strong>{data.branding?.mascotName||"น้องทุเรียน"}</strong><small>{data.branding?.siteName||"Durian Smart Farm"}</small></span></button><nav>{visible.map(([id,label,I])=><button className={tab===id?"active":""} onClick={()=>setTab(id)} key={id}><I/>{label}</button>)}</nav><div className="session-card"><i>{session.name.slice(0,2)}</i><span><b>{session.name}</b><small>@{session.username} · {session.role==="admin"?"ผู้ดูแลระบบ":"ผู้ใช้งาน"}</small></span><button onClick={logout} aria-label="ออกจากระบบ"><LogOut/></button></div><div className="season-mini real"><small>ฤดูปัจจุบัน</small><strong>{data.season?.name||"ยังไม่ได้เปิดฤดูผลิต"}</strong></div></aside><main><header><strong>{farm?.name||"กำลังเตรียมข้อมูลสวน"}</strong><button className="refresh" onClick={load}><RefreshCw/> รีเฟรชข้อมูล</button></header><section className="content">{loading?<div className="loading-panel"><Leaf/> กำลังอ่านข้อมูลจริง...</div>:error?<div className="error-panel"><b>เชื่อมข้อมูลไม่สำเร็จ</b><span>{error}</span><button onClick={load}>ลองใหม่</button></div>:page}</section></main><div className="mobile-nav">{visible.filter(([id])=>["today","farms","work","money","settings"].includes(id)).map(([id,label,I])=><button className={tab===id?"active":""} onClick={()=>setTab(id)} key={id}><I/><span>{label.split(" ")[0]}</span></button>)}</div></div>
