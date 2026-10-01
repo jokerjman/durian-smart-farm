@@ -1,56 +1,900 @@
 "use client";
 import "./settings.css";
 import Image from "next/image";
-import {useEffect,useMemo,useState} from "react";
-import {BarChart3,CalendarDays,Check,Home,Leaf,LogOut,Map,Package,RefreshCw,Save,Settings,ShieldCheck,ShoppingBag,Trees,Users,WalletCards,Wifi} from "lucide-react";
-import {FarmsPlotsPage,TreesPage as RegistryTreesPage} from "./p2-pages";
-import {SeasonsPage} from "./p3-pages";
-import {WorkCalendarPage} from "./p4-pages";
-import {FinancePage,InventoryPage} from "./p5-pages";
-import {HarvestPage} from "./p6-pages";
+import { useEffect, useMemo, useState } from "react";
+import {
+  BarChart3,
+  CalendarDays,
+  Check,
+  Home,
+  Leaf,
+  LogOut,
+  Map,
+  Package,
+  RefreshCw,
+  Save,
+  Settings,
+  ShieldCheck,
+  ShoppingBag,
+  Trees,
+  Users,
+  WalletCards,
+  Wifi,
+} from "lucide-react";
+import { FarmsPlotsPage, TreesPage as RegistryTreesPage } from "./p2-pages";
+import { SeasonsPage } from "./p3-pages";
+import { WorkCalendarPage } from "./p4-pages";
+import { FinancePage, InventoryPage } from "./p5-pages";
+import { HarvestPage } from "./p6-pages";
+import { SmartFarmPage } from "./p7-pages";
 
-type Session={userId:string;username:string;name:string;farmId:string;role:string;permissions:string[];mustChangePassword:boolean};
-type Farm={id:string;name:string;address:string|null;areaRai:number|null;plotCount:number;treeCount:number};
-type Overview={farms:Farm[];selectedFarmId?:string;branding?:{siteName:string;mascotName:string};season:null|{id:string;name:string;status:string;startDate:string;endDate?:string};summary:{treeCount:number;openTaskCount:number;income:number;expense:number;productCount:number};tasks:Array<{id:string;title:string;status:string;scheduledAt:number|null}>};
-type Tab="today"|"farms"|"trees"|"work"|"season"|"smart"|"harvest"|"money"|"report"|"stock"|"users"|"settings";
-const menu:[Tab,string,typeof Home][]=[["today","วันนี้",Home],["farms","สวน/แปลง",Map],["trees","ทะเบียนต้น",Trees],["work","งาน & ปฏิทิน",CalendarDays],["season","ฤดูผลิต",Leaf],["smart","สวนอัจฉริยะ",Wifi],["harvest","ผลผลิต & การขาย",ShoppingBag],["money","บัญชี",WalletCards],["report","วิเคราะห์ & GAP",BarChart3],["stock","คลังปัจจัยการผลิต",Package],["users","ผู้ใช้และสิทธิ์",Users],["settings","ตั้งค่าระบบ",Settings]];
-const permissionByTab:Partial<Record<Tab,string>>={farms:"farms.manage",trees:"trees.manage",work:"work.view",season:"dashboard.view",smart:"smartfarm.manage",harvest:"harvest.manage",money:"finance.view",report:"reports.view",stock:"inventory.view",users:"users.manage",settings:"farms.manage"};
-const empty:Overview={farms:[],branding:{siteName:"Durian Smart Farm",mascotName:"น้องทุเรียน"},season:null,summary:{treeCount:0,openTaskCount:0,income:0,expense:0,productCount:0},tasks:[]};
-const money=(n:number)=>new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:0}).format(n);
+type Session = {
+  userId: string;
+  username: string;
+  name: string;
+  farmId: string;
+  role: string;
+  permissions: string[];
+  mustChangePassword: boolean;
+};
+type Farm = {
+  id: string;
+  name: string;
+  address: string | null;
+  areaRai: number | null;
+  plotCount: number;
+  treeCount: number;
+};
+type Overview = {
+  farms: Farm[];
+  selectedFarmId?: string;
+  branding?: { siteName: string; mascotName: string };
+  season: null | {
+    id: string;
+    name: string;
+    status: string;
+    startDate: string;
+    endDate?: string;
+  };
+  summary: {
+    treeCount: number;
+    openTaskCount: number;
+    income: number;
+    expense: number;
+    productCount: number;
+  };
+  tasks: Array<{
+    id: string;
+    title: string;
+    status: string;
+    scheduledAt: number | null;
+  }>;
+};
+type Tab =
+  | "today"
+  | "farms"
+  | "trees"
+  | "work"
+  | "season"
+  | "smart"
+  | "harvest"
+  | "money"
+  | "report"
+  | "stock"
+  | "users"
+  | "settings";
+const menu: [Tab, string, typeof Home][] = [
+  ["today", "วันนี้", Home],
+  ["farms", "สวน/แปลง", Map],
+  ["trees", "ทะเบียนต้น", Trees],
+  ["work", "งาน & ปฏิทิน", CalendarDays],
+  ["season", "ฤดูผลิต", Leaf],
+  ["smart", "สวนอัจฉริยะ", Wifi],
+  ["harvest", "ผลผลิต & การขาย", ShoppingBag],
+  ["money", "บัญชี", WalletCards],
+  ["report", "วิเคราะห์ & GAP", BarChart3],
+  ["stock", "คลังปัจจัยการผลิต", Package],
+  ["users", "ผู้ใช้และสิทธิ์", Users],
+  ["settings", "ตั้งค่าระบบ", Settings],
+];
+const permissionByTab: Partial<Record<Tab, string>> = {
+  farms: "farms.manage",
+  trees: "trees.manage",
+  work: "work.view",
+  season: "dashboard.view",
+  smart: "smartfarm.manage",
+  harvest: "harvest.manage",
+  money: "finance.view",
+  report: "reports.view",
+  stock: "inventory.view",
+  users: "users.manage",
+  settings: "farms.manage",
+};
+const empty: Overview = {
+  farms: [],
+  branding: { siteName: "Durian Smart Farm", mascotName: "น้องทุเรียน" },
+  season: null,
+  summary: {
+    treeCount: 0,
+    openTaskCount: 0,
+    income: 0,
+    expense: 0,
+    productCount: 0,
+  },
+  tasks: [],
+};
+const money = (n: number) =>
+  new Intl.NumberFormat("th-TH", {
+    style: "currency",
+    currency: "THB",
+    maximumFractionDigits: 0,
+  }).format(n);
 
-export default function LiveApp({session}:{session:Session}){
- const [tab,setTab]=useState<Tab>("today"),[data,setData]=useState<Overview>(empty),[loading,setLoading]=useState(true),[error,setError]=useState("");
- const load=()=>{setLoading(true);setError("");fetch("/api/overview",{cache:"no-store"}).then(async r=>{const body=await r.json();if(!r.ok)throw new Error(body.error||"โหลดข้อมูลไม่สำเร็จ");setData(body)}).catch(e=>setError(e.message)).finally(()=>setLoading(false))};
- useEffect(load,[]);
- const visible=menu.filter(([id])=>session.role==="admin"||!permissionByTab[id]||session.permissions.includes(permissionByTab[id]!));
- const farm=data.farms.find(x=>x.id===data.selectedFarmId)||data.farms[0];
- const logout=async()=>{await fetch("/api/auth/logout",{method:"POST"});location.reload()};
- const page=useMemo(()=>{
-  if(tab==="today")return <Dashboard session={session} farm={farm} data={data} go={setTab}/>;
-  if(tab==="farms")return <FarmsPlotsPage farms={data.farms} refresh={load} openTrees={()=>setTab("trees")}/>;
-  if(tab==="trees")return <RegistryTreesPage/>;
-  if(tab==="season")return <SeasonsPage farms={data.farms} refreshOverview={load}/>;
-  if(tab==="work")return <WorkCalendarPage refreshOverview={load}/>;
-  if(tab==="stock")return <InventoryPage refreshOverview={load}/>;
-  if(tab==="money")return <FinancePage refreshOverview={load}/>;
-  if(tab==="harvest")return <HarvestPage refreshOverview={load}/>;
-  if(tab==="users")return <UsersPage/>;
-  if(tab==="settings")return <SettingsPage saved={load}/>;
-  const copy:Record<Exclude<Tab,"today"|"farms"|"trees"|"work"|"season"|"harvest"|"money"|"stock"|"users"|"settings">,[string,string,string]>={smart:["สวนอัจฉริยะ","ยังไม่มีข้อมูลเฝ้าระวัง","ข้อมูลอากาศ สุขภาพต้น และเซนเซอร์จะเชื่อมใน P7"],report:["วิเคราะห์ & GAP","ยังไม่มีข้อมูลเพียงพอสำหรับรายงาน","รายงานจะคำนวณจากข้อมูลจริงและประวัติฤดูใน P8"]};
-  const [title,headline,detail]=copy[tab];return <EmptyPage title={title} headline={headline} detail={detail}/>;
- },[tab,data,farm,session]);
- return <div className="shell live-shell"><aside><button className="brand" onClick={()=>setTab("today")}><b><Leaf/></b><span><strong>{data.branding?.mascotName||"น้องทุเรียน"}</strong><small>{data.branding?.siteName||"Durian Smart Farm"}</small></span></button><nav>{visible.map(([id,label,I])=><button className={tab===id?"active":""} onClick={()=>setTab(id)} key={id}><I/>{label}</button>)}</nav><div className="session-card"><i>{session.name.slice(0,2)}</i><span><b>{session.name}</b><small>@{session.username} · {session.role==="admin"?"ผู้ดูแลระบบ":"ผู้ใช้งาน"}</small></span><button onClick={logout} aria-label="ออกจากระบบ"><LogOut/></button></div><div className="season-mini real"><small>ฤดูปัจจุบัน</small><strong>{data.season?.name||"ยังไม่ได้เปิดฤดูผลิต"}</strong></div></aside><main><header><strong>{farm?.name||"กำลังเตรียมข้อมูลสวน"}</strong><button className="refresh" onClick={load}><RefreshCw/> รีเฟรชข้อมูล</button></header><section className="content">{loading?<div className="loading-panel"><Leaf/> กำลังอ่านข้อมูลจริง...</div>:error?<div className="error-panel"><b>เชื่อมข้อมูลไม่สำเร็จ</b><span>{error}</span><button onClick={load}>ลองใหม่</button></div>:page}</section></main><div className="mobile-nav">{visible.filter(([id])=>["today","farms","work","money","settings"].includes(id)).map(([id,label,I])=><button className={tab===id?"active":""} onClick={()=>setTab(id)} key={id}><I/><span>{label.split(" ")[0]}</span></button>)}</div></div>
+export default function LiveApp({ session }: { session: Session }) {
+  const [tab, setTab] = useState<Tab>("today"),
+    [data, setData] = useState<Overview>(empty),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState("");
+  const load = () => {
+    setLoading(true);
+    setError("");
+    fetch("/api/overview", { cache: "no-store" })
+      .then(async (r) => {
+        const body = await r.json();
+        if (!r.ok) throw new Error(body.error || "โหลดข้อมูลไม่สำเร็จ");
+        setData(body);
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []);
+  const visible = menu.filter(
+    ([id]) =>
+      session.role === "admin" ||
+      !permissionByTab[id] ||
+      session.permissions.includes(permissionByTab[id]!),
+  );
+  const farm =
+    data.farms.find((x) => x.id === data.selectedFarmId) || data.farms[0];
+  const logout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    location.reload();
+  };
+  const page = useMemo(() => {
+    if (tab === "today")
+      return (
+        <Dashboard session={session} farm={farm} data={data} go={setTab} />
+      );
+    if (tab === "farms")
+      return (
+        <FarmsPlotsPage
+          farms={data.farms}
+          refresh={load}
+          openTrees={() => setTab("trees")}
+        />
+      );
+    if (tab === "trees") return <RegistryTreesPage />;
+    if (tab === "season")
+      return <SeasonsPage farms={data.farms} refreshOverview={load} />;
+    if (tab === "work") return <WorkCalendarPage refreshOverview={load} />;
+    if (tab === "stock") return <InventoryPage refreshOverview={load} />;
+    if (tab === "money") return <FinancePage refreshOverview={load} />;
+    if (tab === "harvest") return <HarvestPage refreshOverview={load} />;
+    if (tab === "smart") return <SmartFarmPage />;
+    if (tab === "users") return <UsersPage />;
+    if (tab === "settings") return <SettingsPage saved={load} />;
+    const copy: Record<
+      Exclude<
+        Tab,
+        | "today"
+        | "farms"
+        | "trees"
+        | "work"
+        | "season"
+        | "smart"
+        | "harvest"
+        | "money"
+        | "stock"
+        | "users"
+        | "settings"
+      >,
+      [string, string, string]
+    > = {
+      report: [
+        "วิเคราะห์ & GAP",
+        "ยังไม่มีข้อมูลเพียงพอสำหรับรายงาน",
+        "รายงานจะคำนวณจากข้อมูลจริงและประวัติฤดูใน P8",
+      ],
+    };
+    const [title, headline, detail] = copy[tab];
+    return <EmptyPage title={title} headline={headline} detail={detail} />;
+  }, [tab, data, farm, session]);
+  return (
+    <div className="shell live-shell">
+      <aside>
+        <button className="brand" onClick={() => setTab("today")}>
+          <b>
+            <Leaf />
+          </b>
+          <span>
+            <strong>{data.branding?.mascotName || "น้องทุเรียน"}</strong>
+            <small>{data.branding?.siteName || "Durian Smart Farm"}</small>
+          </span>
+        </button>
+        <nav>
+          {visible.map(([id, label, I]) => (
+            <button
+              className={tab === id ? "active" : ""}
+              onClick={() => setTab(id)}
+              key={id}
+            >
+              <I />
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="session-card">
+          <i>{session.name.slice(0, 2)}</i>
+          <span>
+            <b>{session.name}</b>
+            <small>
+              @{session.username} ·{" "}
+              {session.role === "admin" ? "ผู้ดูแลระบบ" : "ผู้ใช้งาน"}
+            </small>
+          </span>
+          <button onClick={logout} aria-label="ออกจากระบบ">
+            <LogOut />
+          </button>
+        </div>
+        <div className="season-mini real">
+          <small>ฤดูปัจจุบัน</small>
+          <strong>{data.season?.name || "ยังไม่ได้เปิดฤดูผลิต"}</strong>
+        </div>
+      </aside>
+      <main>
+        <header>
+          <strong>{farm?.name || "กำลังเตรียมข้อมูลสวน"}</strong>
+          <button className="refresh" onClick={load}>
+            <RefreshCw /> รีเฟรชข้อมูล
+          </button>
+        </header>
+        <section className="content">
+          {loading ? (
+            <div className="loading-panel">
+              <Leaf /> กำลังอ่านข้อมูลจริง...
+            </div>
+          ) : error ? (
+            <div className="error-panel">
+              <b>เชื่อมข้อมูลไม่สำเร็จ</b>
+              <span>{error}</span>
+              <button onClick={load}>ลองใหม่</button>
+            </div>
+          ) : (
+            page
+          )}
+        </section>
+      </main>
+      <div className="mobile-nav">
+        {visible
+          .filter(([id]) =>
+            ["today", "farms", "work", "smart", "money", "settings"].includes(
+              id,
+            ),
+          )
+          .map(([id, label, I]) => (
+            <button
+              className={tab === id ? "active" : ""}
+              onClick={() => setTab(id)}
+              key={id}
+            >
+              <I />
+              <span>{label.split(" ")[0]}</span>
+            </button>
+          ))}
+      </div>
+    </div>
+  );
 }
 
-function Dashboard({session,farm,data,go}:{session:Session;farm?:Farm;data:Overview;go:(t:Tab)=>void}){return <><div className="hello"><div><small>ข้อมูลใช้งานจริง</small><h1>สวัสดีครับ {session.name} 👋</h1><p>{farm?`กำลังดูข้อมูล ${farm.name}`:"กำลังเตรียมข้อมูลสวนของคุณ"}</p></div></div><div className="hero clean"><div><em>ศูนย์บัญชาการสวนวันนี้</em><h2>{data.season?data.season.name:"เริ่มต้นจัดโครงสร้างสวน"}</h2><p>{data.season?"ข้อมูลใหม่จะเชื่อมกับฤดูปัจจุบัน":"ขั้นต่อไป: ตรวจข้อมูลสวน เพิ่มแปลง และเปิดฤดูผลิต"}</p><button className="light" onClick={()=>go("farms")}><Map/> ดูข้อมูลสวน</button></div><Image src="/nong-durian.png" alt="น้องทุเรียน" width={300} height={300}/></div><div className="stats"><Stat icon={<Trees/>} label="ต้นทุเรียน" value={String(data.summary.treeCount)} note="จากทะเบียนต้นจริง"/><Stat icon={<CalendarDays/>} label="งานที่ยังไม่เสร็จ" value={String(data.summary.openTaskCount)} note="จากงานในระบบ"/><Stat icon={<WalletCards/>} label="รายรับเดือนนี้" value={money(data.summary.income)} note="จากบัญชีจริง"/><Stat icon={<WalletCards/>} label="รายจ่ายเดือนนี้" value={money(data.summary.expense)} note="จากบัญชีจริง"/></div><div className="grid"><article className="panel"><div className="title"><h3>งานที่ต้องทำ</h3><button onClick={()=>go("work")}>ดูงาน →</button></div>{data.tasks.length?data.tasks.map(x=><div className="real-row" key={x.id}><Check/><span><b>{x.title}</b><small>{x.status}</small></span></div>):<MiniEmpty text="ยังไม่มีงานที่บันทึกไว้"/>}</article><article className="panel"><div className="title"><h3>เริ่มใช้งานจริง</h3></div><ol className="onboarding-list"><li className={farm?"done":""}>ตรวจชื่อและข้อมูลสวน</li><li>เพิ่มแปลงและทะเบียนต้น</li><li>เปิดฤดูการผลิต</li><li>เริ่มบันทึกงานและต้นทุน</li></ol></article></div></>}
-function Stat({icon,label,value,note}:{icon:React.ReactNode;label:string;value:string;note:string}){return <article className="card"><b>{icon}</b><div><small>{label}</small><strong>{value}</strong><span>{note}</span></div></article>}
-function FarmsPage({farms,go}:{farms:Farm[];go:(t:Tab)=>void}){return <><PageHead eyebrow="ข้อมูลจากฐานข้อมูลจริง" title="สวนของฉัน" detail="P0 รักษาข้อมูลสวนจริงและซ่อนข้อมูลตัวอย่างทั้งหมด"/><div className="farmgrid">{farms.map((f,i)=><article className="farm" key={f.id}><Map/><small>{i===0?"สวนหลัก":"สวนเพิ่มเติม"}</small><h2>{f.name}</h2><p>{f.address||"ยังไม่ได้ระบุที่อยู่"}{f.areaRai?` · ${f.areaRai} ไร่`:""}</p><strong>{f.plotCount} แปลง · {f.treeCount} ต้น</strong><button onClick={()=>go("trees")}>เปิดทะเบียนต้น →</button></article>)}</div>{!farms.length&&<EmptyCard headline="ยังไม่มีข้อมูลสวน" detail="กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจการตั้งค่าเริ่มต้น"/>}{farms.length>0&&farms.every(x=>x.plotCount===0)&&<EmptyCard headline="มีข้อมูลสวนแล้ว แต่ยังไม่มีแปลง" detail="การเพิ่มและแก้ไขแปลงจะเปิดใช้งานใน Production Upgrade P2"/>}</>}
-function EmptyPage({title,headline,detail}:{title:string;headline:string;detail:string}){return <><PageHead eyebrow="ข้อมูลใช้งานจริง" title={title} detail="หน้าจอนี้ไม่แสดงข้อมูลตัวอย่างแล้ว"/><EmptyCard headline={headline} detail={detail}/></>}
-function PageHead({eyebrow,title,detail}:{eyebrow:string;title:string;detail:string}){return <div className="head"><div><small>{eyebrow}</small><h1>{title}</h1><p>{detail}</p></div></div>}
-function EmptyCard({headline,detail}:{headline:string;detail:string}){return <article className="empty-card"><i><Leaf/></i><h2>{headline}</h2><p>{detail}</p><span><ShieldCheck/> ไม่มีการสร้างข้อมูลสมมติในฐานข้อมูล</span></article>}
-function MiniEmpty({text}:{text:string}){return <div className="mini-empty"><Leaf/><span>{text}</span></div>}
-function UsersPage(){const [users,setUsers]=useState<Array<{id:string;name:string;username:string;role:string;isActive:number|boolean}>>([]),[loading,setLoading]=useState(true);useEffect(()=>{fetch("/api/admin/users",{cache:"no-store"}).then(r=>r.json()).then(x=>setUsers(x.users||[])).finally(()=>setLoading(false))},[]);return <><PageHead eyebrow="ADMIN · LOCAL ACCOUNTS" title="ผู้ใช้และสิทธิ์" detail="บัญชีจริงที่สร้างโดย Admin ไม่ใช้อีเมลหรือบัญชี ChatGPT"/><div className="permission-overview"><div><ShieldCheck/><p><b>Admin ควบคุมระบบทั้งหมด</b><span>การกำหนดสิทธิ์ละเอียดจะตรวจครบทั้งหน้าเว็บและเซิร์ฟเวอร์ใน P9</span></p></div><span>{users.length} บัญชี</span></div><div className="user-table"><div className="user-head"><span>ผู้ใช้</span><span>บทบาท</span><span>สถานะ</span><span/><span/></div>{loading?<div className="mini-empty"><Leaf/>กำลังโหลดผู้ใช้...</div>:users.map(u=><div className="user-row" key={u.id}><span><i>{u.name.slice(0,2)}</i><b>{u.name}<small>@{u.username}</small></b></span><span>{u.role==="admin"?"Admin":"User"}</span><em className={u.isActive?"good":"pending"}>{u.isActive?"ใช้งาน":"ระงับ"}</em><span/><button disabled>🔒</button></div>)}</div></>}
+function Dashboard({
+  session,
+  farm,
+  data,
+  go,
+}: {
+  session: Session;
+  farm?: Farm;
+  data: Overview;
+  go: (t: Tab) => void;
+}) {
+  return (
+    <>
+      <div className="hello">
+        <div>
+          <small>ข้อมูลใช้งานจริง</small>
+          <h1>สวัสดีครับ {session.name} 👋</h1>
+          <p>
+            {farm ? `กำลังดูข้อมูล ${farm.name}` : "กำลังเตรียมข้อมูลสวนของคุณ"}
+          </p>
+        </div>
+      </div>
+      <div className="hero clean">
+        <div>
+          <em>ศูนย์บัญชาการสวนวันนี้</em>
+          <h2>{data.season ? data.season.name : "เริ่มต้นจัดโครงสร้างสวน"}</h2>
+          <p>
+            {data.season
+              ? "ข้อมูลใหม่จะเชื่อมกับฤดูปัจจุบัน"
+              : "ขั้นต่อไป: ตรวจข้อมูลสวน เพิ่มแปลง และเปิดฤดูผลิต"}
+          </p>
+          <button className="light" onClick={() => go("farms")}>
+            <Map /> ดูข้อมูลสวน
+          </button>
+        </div>
+        <Image
+          src="/nong-durian.png"
+          alt="น้องทุเรียน"
+          width={300}
+          height={300}
+        />
+      </div>
+      <div className="stats">
+        <Stat
+          icon={<Trees />}
+          label="ต้นทุเรียน"
+          value={String(data.summary.treeCount)}
+          note="จากทะเบียนต้นจริง"
+        />
+        <Stat
+          icon={<CalendarDays />}
+          label="งานที่ยังไม่เสร็จ"
+          value={String(data.summary.openTaskCount)}
+          note="จากงานในระบบ"
+        />
+        <Stat
+          icon={<WalletCards />}
+          label="รายรับเดือนนี้"
+          value={money(data.summary.income)}
+          note="จากบัญชีจริง"
+        />
+        <Stat
+          icon={<WalletCards />}
+          label="รายจ่ายเดือนนี้"
+          value={money(data.summary.expense)}
+          note="จากบัญชีจริง"
+        />
+      </div>
+      <div className="grid">
+        <article className="panel">
+          <div className="title">
+            <h3>งานที่ต้องทำ</h3>
+            <button onClick={() => go("work")}>ดูงาน →</button>
+          </div>
+          {data.tasks.length ? (
+            data.tasks.map((x) => (
+              <div className="real-row" key={x.id}>
+                <Check />
+                <span>
+                  <b>{x.title}</b>
+                  <small>{x.status}</small>
+                </span>
+              </div>
+            ))
+          ) : (
+            <MiniEmpty text="ยังไม่มีงานที่บันทึกไว้" />
+          )}
+        </article>
+        <article className="panel">
+          <div className="title">
+            <h3>เริ่มใช้งานจริง</h3>
+          </div>
+          <ol className="onboarding-list">
+            <li className={farm ? "done" : ""}>ตรวจชื่อและข้อมูลสวน</li>
+            <li>เพิ่มแปลงและทะเบียนต้น</li>
+            <li>เปิดฤดูการผลิต</li>
+            <li>เริ่มบันทึกงานและต้นทุน</li>
+          </ol>
+        </article>
+      </div>
+    </>
+  );
+}
+function Stat({
+  icon,
+  label,
+  value,
+  note,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <article className="card">
+      <b>{icon}</b>
+      <div>
+        <small>{label}</small>
+        <strong>{value}</strong>
+        <span>{note}</span>
+      </div>
+    </article>
+  );
+}
+function FarmsPage({ farms, go }: { farms: Farm[]; go: (t: Tab) => void }) {
+  return (
+    <>
+      <PageHead
+        eyebrow="ข้อมูลจากฐานข้อมูลจริง"
+        title="สวนของฉัน"
+        detail="P0 รักษาข้อมูลสวนจริงและซ่อนข้อมูลตัวอย่างทั้งหมด"
+      />
+      <div className="farmgrid">
+        {farms.map((f, i) => (
+          <article className="farm" key={f.id}>
+            <Map />
+            <small>{i === 0 ? "สวนหลัก" : "สวนเพิ่มเติม"}</small>
+            <h2>{f.name}</h2>
+            <p>
+              {f.address || "ยังไม่ได้ระบุที่อยู่"}
+              {f.areaRai ? ` · ${f.areaRai} ไร่` : ""}
+            </p>
+            <strong>
+              {f.plotCount} แปลง · {f.treeCount} ต้น
+            </strong>
+            <button onClick={() => go("trees")}>เปิดทะเบียนต้น →</button>
+          </article>
+        ))}
+      </div>
+      {!farms.length && (
+        <EmptyCard
+          headline="ยังไม่มีข้อมูลสวน"
+          detail="กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจการตั้งค่าเริ่มต้น"
+        />
+      )}
+      {farms.length > 0 && farms.every((x) => x.plotCount === 0) && (
+        <EmptyCard
+          headline="มีข้อมูลสวนแล้ว แต่ยังไม่มีแปลง"
+          detail="การเพิ่มและแก้ไขแปลงจะเปิดใช้งานใน Production Upgrade P2"
+        />
+      )}
+    </>
+  );
+}
+function EmptyPage({
+  title,
+  headline,
+  detail,
+}: {
+  title: string;
+  headline: string;
+  detail: string;
+}) {
+  return (
+    <>
+      <PageHead
+        eyebrow="ข้อมูลใช้งานจริง"
+        title={title}
+        detail="หน้าจอนี้ไม่แสดงข้อมูลตัวอย่างแล้ว"
+      />
+      <EmptyCard headline={headline} detail={detail} />
+    </>
+  );
+}
+function PageHead({
+  eyebrow,
+  title,
+  detail,
+}: {
+  eyebrow: string;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <div className="head">
+      <div>
+        <small>{eyebrow}</small>
+        <h1>{title}</h1>
+        <p>{detail}</p>
+      </div>
+    </div>
+  );
+}
+function EmptyCard({ headline, detail }: { headline: string; detail: string }) {
+  return (
+    <article className="empty-card">
+      <i>
+        <Leaf />
+      </i>
+      <h2>{headline}</h2>
+      <p>{detail}</p>
+      <span>
+        <ShieldCheck /> ไม่มีการสร้างข้อมูลสมมติในฐานข้อมูล
+      </span>
+    </article>
+  );
+}
+function MiniEmpty({ text }: { text: string }) {
+  return (
+    <div className="mini-empty">
+      <Leaf />
+      <span>{text}</span>
+    </div>
+  );
+}
+function UsersPage() {
+  const [users, setUsers] = useState<
+      Array<{
+        id: string;
+        name: string;
+        username: string;
+        role: string;
+        isActive: number | boolean;
+      }>
+    >([]),
+    [loading, setLoading] = useState(true);
+  useEffect(() => {
+    fetch("/api/admin/users", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((x) => setUsers(x.users || []))
+      .finally(() => setLoading(false));
+  }, []);
+  return (
+    <>
+      <PageHead
+        eyebrow="ADMIN · LOCAL ACCOUNTS"
+        title="ผู้ใช้และสิทธิ์"
+        detail="บัญชีจริงที่สร้างโดย Admin ไม่ใช้อีเมลหรือบัญชี ChatGPT"
+      />
+      <div className="permission-overview">
+        <div>
+          <ShieldCheck />
+          <p>
+            <b>Admin ควบคุมระบบทั้งหมด</b>
+            <span>
+              การกำหนดสิทธิ์ละเอียดจะตรวจครบทั้งหน้าเว็บและเซิร์ฟเวอร์ใน P9
+            </span>
+          </p>
+        </div>
+        <span>{users.length} บัญชี</span>
+      </div>
+      <div className="user-table">
+        <div className="user-head">
+          <span>ผู้ใช้</span>
+          <span>บทบาท</span>
+          <span>สถานะ</span>
+          <span />
+          <span />
+        </div>
+        {loading ? (
+          <div className="mini-empty">
+            <Leaf />
+            กำลังโหลดผู้ใช้...
+          </div>
+        ) : (
+          users.map((u) => (
+            <div className="user-row" key={u.id}>
+              <span>
+                <i>{u.name.slice(0, 2)}</i>
+                <b>
+                  {u.name}
+                  <small>@{u.username}</small>
+                </b>
+              </span>
+              <span>{u.role === "admin" ? "Admin" : "User"}</span>
+              <em className={u.isActive ? "good" : "pending"}>
+                {u.isActive ? "ใช้งาน" : "ระงับ"}
+              </em>
+              <span />
+              <button disabled>🔒</button>
+            </div>
+          ))
+        )}
+      </div>
+    </>
+  );
+}
 
-type SettingsForm={farmName:string;address:string;areaRai:string;siteName:string;mascotName:string;ownerName:string;timezone:string;dateFormat:string;currency:string;areaUnit:string;weightUnit:string;volumeUnit:string;defaultTankLiters:string;farmCodePrefix:string;plotCodePrefix:string;treeCodePrefix:string;customCategories:string;customUnits:string};
-const blankSettings:SettingsForm={farmName:"",address:"",areaRai:"",siteName:"Durian Smart Farm",mascotName:"น้องทุเรียน",ownerName:"",timezone:"Asia/Bangkok",dateFormat:"DD/MM/YYYY",currency:"THB",areaUnit:"ไร่",weightUnit:"กก.",volumeUnit:"ลิตร",defaultTankLiters:"200",farmCodePrefix:"FARM",plotCodePrefix:"PLOT",treeCodePrefix:"DUR",customCategories:"",customUnits:""};
-function SettingsPage({saved}:{saved:()=>void}){const [form,setForm]=useState(blankSettings),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[message,setMessage]=useState("");const set=(key:keyof SettingsForm,value:string)=>setForm(x=>({...x,[key]:value}));useEffect(()=>{fetch("/api/settings",{cache:"no-store"}).then(r=>r.json()).then(data=>{if(data.error){setMessage(data.error);return}setForm({...blankSettings,...data.settings,farmName:data.farm.name,address:data.farm.address||"",areaRai:data.farm.areaRai?String(data.farm.areaRai):"",defaultTankLiters:String(data.settings.defaultTankLiters||200),customCategories:(data.settings.customCategories||[]).join(", "),customUnits:(data.settings.customUnits||[]).join(", ")})}).finally(()=>setLoading(false))},[]);const submit=async(e:React.FormEvent)=>{e.preventDefault();setSaving(true);setMessage("");const body={...form,areaRai:Number(form.areaRai)||null,defaultTankLiters:Number(form.defaultTankLiters)||200,customCategories:form.customCategories.split(","),customUnits:form.customUnits.split(",")};const r=await fetch("/api/settings",{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const data=await r.json();setSaving(false);if(!r.ok){setMessage(data.error||"บันทึกไม่สำเร็จ");return}setMessage("บันทึกการตั้งค่าเรียบร้อยแล้ว");saved()};if(loading)return <div className="loading-panel"><Leaf/> กำลังโหลดการตั้งค่า...</div>;return <><PageHead eyebrow="PRODUCTION UPGRADE P1" title="ตั้งค่าระบบและสวน" detail="ค่ากลางเหล่านี้ใช้ร่วมกันในงาน คลัง บัญชี และฤดูผลิต"/><form className="settings-form" onSubmit={submit}><section><h2>เว็บไซต์และเจ้าของ</h2><div className="settings-grid"><label>ชื่อเว็บไซต์<input value={form.siteName} onChange={e=>set("siteName",e.target.value)}/></label><label>ชื่อมาสคอต<input value={form.mascotName} onChange={e=>set("mascotName",e.target.value)}/></label><label>ชื่อเจ้าของ/ผู้ดูแล<input value={form.ownerName} onChange={e=>set("ownerName",e.target.value)}/></label><label>เขตเวลา<select value={form.timezone} onChange={e=>set("timezone",e.target.value)}><option>Asia/Bangkok</option></select></label></div></section><section><h2>ข้อมูลสวนหลัก</h2><div className="settings-grid"><label>ชื่อสวน<input value={form.farmName} onChange={e=>set("farmName",e.target.value)} required/></label><label>พื้นที่สวน<input inputMode="decimal" value={form.areaRai} onChange={e=>set("areaRai",e.target.value)}/></label><label className="wide">ที่อยู่<textarea rows={3} value={form.address} onChange={e=>set("address",e.target.value)}/></label></div></section><section><h2>หน่วยและค่าเริ่มต้น</h2><div className="settings-grid thirds"><label>รูปแบบวันที่<select value={form.dateFormat} onChange={e=>set("dateFormat",e.target.value)}><option>DD/MM/YYYY</option><option>YYYY-MM-DD</option></select></label><label>สกุลเงิน<select value={form.currency} onChange={e=>set("currency",e.target.value)}><option>THB</option></select></label><label>หน่วยพื้นที่<input value={form.areaUnit} onChange={e=>set("areaUnit",e.target.value)}/></label><label>หน่วยน้ำหนัก<input value={form.weightUnit} onChange={e=>set("weightUnit",e.target.value)}/></label><label>หน่วยปริมาตร<input value={form.volumeUnit} onChange={e=>set("volumeUnit",e.target.value)}/></label><label>ขนาดถังพ่นเริ่มต้น (ลิตร)<input type="number" min="1" value={form.defaultTankLiters} onChange={e=>set("defaultTankLiters",e.target.value)}/></label></div></section><section><h2>รูปแบบรหัส</h2><div className="settings-grid thirds"><label>รหัสสวน<input value={form.farmCodePrefix} onChange={e=>set("farmCodePrefix",e.target.value.toUpperCase())}/></label><label>รหัสแปลง<input value={form.plotCodePrefix} onChange={e=>set("plotCodePrefix",e.target.value.toUpperCase())}/></label><label>Durian ID<input value={form.treeCodePrefix} onChange={e=>set("treeCodePrefix",e.target.value.toUpperCase())}/></label></div><p className="setting-hint">ตัวอย่าง: {form.farmCodePrefix||"FARM"}-01 · {form.plotCodePrefix||"PLOT"}-A · {form.treeCodePrefix||"DUR"}-A-001</p></section><section><h2>รายการกำหนดเอง</h2><div className="settings-grid"><label>หมวดรายรับ/รายจ่ายเพิ่มเติม<textarea rows={3} value={form.customCategories} onChange={e=>set("customCategories",e.target.value)} placeholder="คั่นแต่ละรายการด้วยเครื่องหมายจุลภาค"/></label><label>หน่วยนับเพิ่มเติม<textarea rows={3} value={form.customUnits} onChange={e=>set("customUnits",e.target.value)} placeholder="เช่น ขวด, แกลลอน, ม้วน"/></label></div></section>{message&&<p className={message.includes("เรียบร้อย")?"settings-success":"auth-error"}>{message.includes("เรียบร้อย")&&<Check/>}{message}</p>}<button className="primary settings-save" disabled={saving}><Save/>{saving?"กำลังบันทึก...":"บันทึกการตั้งค่า"}</button></form></>}
+type SettingsForm = {
+  farmName: string;
+  address: string;
+  areaRai: string;
+  siteName: string;
+  mascotName: string;
+  ownerName: string;
+  timezone: string;
+  dateFormat: string;
+  currency: string;
+  areaUnit: string;
+  weightUnit: string;
+  volumeUnit: string;
+  defaultTankLiters: string;
+  farmCodePrefix: string;
+  plotCodePrefix: string;
+  treeCodePrefix: string;
+  customCategories: string;
+  customUnits: string;
+};
+const blankSettings: SettingsForm = {
+  farmName: "",
+  address: "",
+  areaRai: "",
+  siteName: "Durian Smart Farm",
+  mascotName: "น้องทุเรียน",
+  ownerName: "",
+  timezone: "Asia/Bangkok",
+  dateFormat: "DD/MM/YYYY",
+  currency: "THB",
+  areaUnit: "ไร่",
+  weightUnit: "กก.",
+  volumeUnit: "ลิตร",
+  defaultTankLiters: "200",
+  farmCodePrefix: "FARM",
+  plotCodePrefix: "PLOT",
+  treeCodePrefix: "DUR",
+  customCategories: "",
+  customUnits: "",
+};
+function SettingsPage({ saved }: { saved: () => void }) {
+  const [form, setForm] = useState(blankSettings),
+    [loading, setLoading] = useState(true),
+    [saving, setSaving] = useState(false),
+    [message, setMessage] = useState("");
+  const set = (key: keyof SettingsForm, value: string) =>
+    setForm((x) => ({ ...x, [key]: value }));
+  useEffect(() => {
+    fetch("/api/settings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) {
+          setMessage(data.error);
+          return;
+        }
+        setForm({
+          ...blankSettings,
+          ...data.settings,
+          farmName: data.farm.name,
+          address: data.farm.address || "",
+          areaRai: data.farm.areaRai ? String(data.farm.areaRai) : "",
+          defaultTankLiters: String(data.settings.defaultTankLiters || 200),
+          customCategories: (data.settings.customCategories || []).join(", "),
+          customUnits: (data.settings.customUnits || []).join(", "),
+        });
+      })
+      .finally(() => setLoading(false));
+  }, []);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage("");
+    const body = {
+      ...form,
+      areaRai: Number(form.areaRai) || null,
+      defaultTankLiters: Number(form.defaultTankLiters) || 200,
+      customCategories: form.customCategories.split(","),
+      customUnits: form.customUnits.split(","),
+    };
+    const r = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    setSaving(false);
+    if (!r.ok) {
+      setMessage(data.error || "บันทึกไม่สำเร็จ");
+      return;
+    }
+    setMessage("บันทึกการตั้งค่าเรียบร้อยแล้ว");
+    saved();
+  };
+  if (loading)
+    return (
+      <div className="loading-panel">
+        <Leaf /> กำลังโหลดการตั้งค่า...
+      </div>
+    );
+  return (
+    <>
+      <PageHead
+        eyebrow="PRODUCTION UPGRADE P1"
+        title="ตั้งค่าระบบและสวน"
+        detail="ค่ากลางเหล่านี้ใช้ร่วมกันในงาน คลัง บัญชี และฤดูผลิต"
+      />
+      <form className="settings-form" onSubmit={submit}>
+        <section>
+          <h2>เว็บไซต์และเจ้าของ</h2>
+          <div className="settings-grid">
+            <label>
+              ชื่อเว็บไซต์
+              <input
+                value={form.siteName}
+                onChange={(e) => set("siteName", e.target.value)}
+              />
+            </label>
+            <label>
+              ชื่อมาสคอต
+              <input
+                value={form.mascotName}
+                onChange={(e) => set("mascotName", e.target.value)}
+              />
+            </label>
+            <label>
+              ชื่อเจ้าของ/ผู้ดูแล
+              <input
+                value={form.ownerName}
+                onChange={(e) => set("ownerName", e.target.value)}
+              />
+            </label>
+            <label>
+              เขตเวลา
+              <select
+                value={form.timezone}
+                onChange={(e) => set("timezone", e.target.value)}
+              >
+                <option>Asia/Bangkok</option>
+              </select>
+            </label>
+          </div>
+        </section>
+        <section>
+          <h2>ข้อมูลสวนหลัก</h2>
+          <div className="settings-grid">
+            <label>
+              ชื่อสวน
+              <input
+                value={form.farmName}
+                onChange={(e) => set("farmName", e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              พื้นที่สวน
+              <input
+                inputMode="decimal"
+                value={form.areaRai}
+                onChange={(e) => set("areaRai", e.target.value)}
+              />
+            </label>
+            <label className="wide">
+              ที่อยู่
+              <textarea
+                rows={3}
+                value={form.address}
+                onChange={(e) => set("address", e.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+        <section>
+          <h2>หน่วยและค่าเริ่มต้น</h2>
+          <div className="settings-grid thirds">
+            <label>
+              รูปแบบวันที่
+              <select
+                value={form.dateFormat}
+                onChange={(e) => set("dateFormat", e.target.value)}
+              >
+                <option>DD/MM/YYYY</option>
+                <option>YYYY-MM-DD</option>
+              </select>
+            </label>
+            <label>
+              สกุลเงิน
+              <select
+                value={form.currency}
+                onChange={(e) => set("currency", e.target.value)}
+              >
+                <option>THB</option>
+              </select>
+            </label>
+            <label>
+              หน่วยพื้นที่
+              <input
+                value={form.areaUnit}
+                onChange={(e) => set("areaUnit", e.target.value)}
+              />
+            </label>
+            <label>
+              หน่วยน้ำหนัก
+              <input
+                value={form.weightUnit}
+                onChange={(e) => set("weightUnit", e.target.value)}
+              />
+            </label>
+            <label>
+              หน่วยปริมาตร
+              <input
+                value={form.volumeUnit}
+                onChange={(e) => set("volumeUnit", e.target.value)}
+              />
+            </label>
+            <label>
+              ขนาดถังพ่นเริ่มต้น (ลิตร)
+              <input
+                type="number"
+                min="1"
+                value={form.defaultTankLiters}
+                onChange={(e) => set("defaultTankLiters", e.target.value)}
+              />
+            </label>
+          </div>
+        </section>
+        <section>
+          <h2>รูปแบบรหัส</h2>
+          <div className="settings-grid thirds">
+            <label>
+              รหัสสวน
+              <input
+                value={form.farmCodePrefix}
+                onChange={(e) =>
+                  set("farmCodePrefix", e.target.value.toUpperCase())
+                }
+              />
+            </label>
+            <label>
+              รหัสแปลง
+              <input
+                value={form.plotCodePrefix}
+                onChange={(e) =>
+                  set("plotCodePrefix", e.target.value.toUpperCase())
+                }
+              />
+            </label>
+            <label>
+              Durian ID
+              <input
+                value={form.treeCodePrefix}
+                onChange={(e) =>
+                  set("treeCodePrefix", e.target.value.toUpperCase())
+                }
+              />
+            </label>
+          </div>
+          <p className="setting-hint">
+            ตัวอย่าง: {form.farmCodePrefix || "FARM"}-01 ·{" "}
+            {form.plotCodePrefix || "PLOT"}-A · {form.treeCodePrefix || "DUR"}
+            -A-001
+          </p>
+        </section>
+        <section>
+          <h2>รายการกำหนดเอง</h2>
+          <div className="settings-grid">
+            <label>
+              หมวดรายรับ/รายจ่ายเพิ่มเติม
+              <textarea
+                rows={3}
+                value={form.customCategories}
+                onChange={(e) => set("customCategories", e.target.value)}
+                placeholder="คั่นแต่ละรายการด้วยเครื่องหมายจุลภาค"
+              />
+            </label>
+            <label>
+              หน่วยนับเพิ่มเติม
+              <textarea
+                rows={3}
+                value={form.customUnits}
+                onChange={(e) => set("customUnits", e.target.value)}
+                placeholder="เช่น ขวด, แกลลอน, ม้วน"
+              />
+            </label>
+          </div>
+        </section>
+        {message && (
+          <p
+            className={
+              message.includes("เรียบร้อย") ? "settings-success" : "auth-error"
+            }
+          >
+            {message.includes("เรียบร้อย") && <Check />}
+            {message}
+          </p>
+        )}
+        <button className="primary settings-save" disabled={saving}>
+          <Save />
+          {saving ? "กำลังบันทึก..." : "บันทึกการตั้งค่า"}
+        </button>
+      </form>
+    </>
+  );
+}
