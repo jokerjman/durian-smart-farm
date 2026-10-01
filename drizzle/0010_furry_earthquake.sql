@@ -1,0 +1,2 @@
+ALTER TABLE `stock_movements` ADD `work_material_plan_id` text REFERENCES work_material_plans(id);--> statement-breakpoint
+CREATE INDEX `stock_movements_work_material_idx` ON `stock_movements` (`work_material_plan_id`);

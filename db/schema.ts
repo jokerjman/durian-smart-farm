@@ -1,39 +1,684 @@
-import {integer,real,sqliteTable,text,uniqueIndex,index} from "drizzle-orm/sqlite-core";
-const audit={createdAt:integer("created_at",{mode:"timestamp"}).notNull(),updatedAt:integer("updated_at",{mode:"timestamp"}).notNull()};
-export const users=sqliteTable("users",{id:text("id").primaryKey(),name:text("name").notNull(),email:text("email").notNull(),...audit},t=>[uniqueIndex("users_email_uq").on(t.email)]);
-export const localAccounts=sqliteTable("local_accounts",{id:text("id").primaryKey(),userId:text("user_id").notNull().references(()=>users.id),username:text("username").notNull(),passwordHash:text("password_hash").notNull(),passwordSalt:text("password_salt").notNull(),passwordIterations:integer("password_iterations").notNull(),mustChangePassword:integer("must_change_password",{mode:"boolean"}).notNull(),isActive:integer("is_active",{mode:"boolean"}).notNull(),failedAttempts:integer("failed_attempts").notNull(),lockedUntil:integer("locked_until",{mode:"timestamp"}),lastLoginAt:integer("last_login_at",{mode:"timestamp"}),...audit},t=>[uniqueIndex("local_accounts_username_uq").on(t.username),uniqueIndex("local_accounts_user_uq").on(t.userId)]);
-export const appSessions=sqliteTable("app_sessions",{id:text("id").primaryKey(),userId:text("user_id").notNull().references(()=>users.id),tokenHash:text("token_hash").notNull(),expiresAt:integer("expires_at",{mode:"timestamp"}).notNull(),lastSeenAt:integer("last_seen_at",{mode:"timestamp"}).notNull(),revokedAt:integer("revoked_at",{mode:"timestamp"}),createdAt:integer("created_at",{mode:"timestamp"}).notNull()},t=>[uniqueIndex("app_sessions_token_uq").on(t.tokenHash),index("app_sessions_user_expiry_idx").on(t.userId,t.expiresAt)]);
-export const userPermissions=sqliteTable("user_permissions",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),userId:text("user_id").notNull().references(()=>users.id),permissionKey:text("permission_key").notNull(),allowed:integer("allowed",{mode:"boolean"}).notNull(),createdAt:integer("created_at",{mode:"timestamp"}).notNull(),updatedAt:integer("updated_at",{mode:"timestamp"}).notNull()},t=>[uniqueIndex("user_permissions_scope_uq").on(t.farmId,t.userId,t.permissionKey),index("user_permissions_user_idx").on(t.userId)]);
-export const recoveryCodes=sqliteTable("recovery_codes",{id:text("id").primaryKey(),userId:text("user_id").notNull().references(()=>users.id),codeHash:text("code_hash").notNull(),usedAt:integer("used_at",{mode:"timestamp"}),createdAt:integer("created_at",{mode:"timestamp"}).notNull()},t=>[uniqueIndex("recovery_codes_hash_uq").on(t.codeHash),index("recovery_codes_user_idx").on(t.userId)]);
-export const farmMembers=sqliteTable("farm_members",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),userId:text("user_id").notNull().references(()=>users.id),role:text("role").notNull(),plotScopeId:text("plot_scope_id"),status:text("status").notNull(),...audit},t=>[uniqueIndex("farm_members_farm_user_uq").on(t.farmId,t.userId),index("farm_members_user_idx").on(t.userId)]);
-export const userInvitations=sqliteTable("user_invitations",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),email:text("email").notNull(),role:text("role").notNull(),plotScopeId:text("plot_scope_id"),tokenHash:text("token_hash").notNull(),expiresAt:integer("expires_at",{mode:"timestamp"}).notNull(),acceptedAt:integer("accepted_at",{mode:"timestamp"}),invitedBy:text("invited_by").notNull().references(()=>users.id),...audit},t=>[index("invitations_farm_email_idx").on(t.farmId,t.email)]);
-export const auditLogs=sqliteTable("audit_logs",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),actorId:text("actor_id").notNull().references(()=>users.id),action:text("action").notNull(),entityType:text("entity_type").notNull(),entityId:text("entity_id"),detailJson:text("detail_json"),createdAt:integer("created_at",{mode:"timestamp"}).notNull()},t=>[index("audit_farm_date_idx").on(t.farmId,t.createdAt)]);
-export const farms=sqliteTable("farms",{id:text("id").primaryKey(),ownerId:text("owner_id").notNull().references(()=>users.id),code:text("code"),name:text("name").notNull(),address:text("address"),areaRai:real("area_rai"),...audit},t=>[index("farms_owner_idx").on(t.ownerId),uniqueIndex("farms_code_uq").on(t.code)]);
-export const farmSettings=sqliteTable("farm_settings",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),siteName:text("site_name").notNull(),mascotName:text("mascot_name").notNull(),ownerName:text("owner_name"),timezone:text("timezone").notNull(),dateFormat:text("date_format").notNull(),currency:text("currency").notNull(),areaUnit:text("area_unit").notNull(),weightUnit:text("weight_unit").notNull(),volumeUnit:text("volume_unit").notNull(),defaultTankLiters:real("default_tank_liters").notNull(),farmCodePrefix:text("farm_code_prefix").notNull(),plotCodePrefix:text("plot_code_prefix").notNull(),treeCodePrefix:text("tree_code_prefix").notNull(),customCategoriesJson:text("custom_categories_json"),customUnitsJson:text("custom_units_json"),logoKey:text("logo_key"),...audit},t=>[uniqueIndex("farm_settings_farm_uq").on(t.farmId)]);
-export const plots=sqliteTable("plots",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),code:text("code"),name:text("name").notNull(),areaRai:real("area_rai"),geoJson:text("geo_json"),note:text("note"),...audit},t=>[index("plots_farm_idx").on(t.farmId),uniqueIndex("plots_farm_code_uq").on(t.farmId,t.code)]);
-export const seasons=sqliteTable("seasons",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),name:text("name").notNull(),startDate:text("start_date").notNull(),endDate:text("end_date"),status:text("status").notNull(),targetKg:real("target_kg"),budget:real("budget"),actualKg:real("actual_kg"),summary:text("summary"),closedAt:integer("closed_at",{mode:"timestamp"}),closedBy:text("closed_by").references(()=>users.id),...audit},t=>[index("seasons_farm_idx").on(t.farmId)]);
-export const seasonStages=sqliteTable("season_stages",{id:text("id").primaryKey(),seasonId:text("season_id").notNull().references(()=>seasons.id),name:text("name").notNull(),sequence:integer("sequence").notNull(),status:text("status").notNull(),startedOn:text("started_on"),completedOn:text("completed_on"),note:text("note"),...audit},t=>[uniqueIndex("season_stages_order_uq").on(t.seasonId,t.sequence),index("season_stages_season_idx").on(t.seasonId)]);
-export const trees=sqliteTable("trees",{id:text("id").primaryKey(),durianId:text("durian_id").notNull(),plotId:text("plot_id").notNull().references(()=>plots.id),variety:text("variety").notNull(),plantedAt:text("planted_at"),status:text("status").notNull(),productionStage:text("production_stage"),qrKey:text("qr_key").notNull(),photoKey:text("photo_key"),note:text("note"),...audit},t=>[uniqueIndex("trees_durian_id_uq").on(t.durianId),index("trees_plot_idx").on(t.plotId)]);
-export const treeEvents=sqliteTable("tree_events",{id:text("id").primaryKey(),treeId:text("tree_id").notNull().references(()=>trees.id),eventType:text("event_type").notNull(),note:text("note"),photoKey:text("photo_key"),eventAt:integer("event_at",{mode:"timestamp"}).notNull()},t=>[index("tree_events_tree_date_idx").on(t.treeId,t.eventAt)]);
-export const workItems=sqliteTable("work_items",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),plotId:text("plot_id").references(()=>plots.id),treeId:text("tree_id").references(()=>trees.id),seasonId:text("season_id").references(()=>seasons.id),title:text("title").notNull(),description:text("description"),workType:text("work_type").notNull(),priority:text("priority").notNull().default("normal"),status:text("status").notNull(),scheduledAt:integer("scheduled_at",{mode:"timestamp"}),completedAt:integer("completed_at",{mode:"timestamp"}),assigneeId:text("assignee_id").references(()=>users.id),createdBy:text("created_by").references(()=>users.id),tankLiters:real("tank_liters"),tankCount:real("tank_count"),actualTankCount:real("actual_tank_count"),...audit},t=>[index("work_schedule_idx").on(t.farmId,t.scheduledAt)]);
-export const workMaterialPlans=sqliteTable("work_material_plans",{id:text("id").primaryKey(),workItemId:text("work_item_id").notNull().references(()=>workItems.id),productName:text("product_name").notNull(),productKind:text("product_kind").notNull(),brand:text("brand"),commonName:text("common_name"),ratePer200l:real("rate_per_200l").notNull(),rateUnit:text("rate_unit").notNull(),tankCount:real("tank_count").notNull(),plannedQuantity:real("planned_quantity").notNull(),actualQuantity:real("actual_quantity"),stockProductId:text("stock_product_id").references(()=>products.id),...audit},t=>[index("work_materials_work_idx").on(t.workItemId)]);
-export const categories=sqliteTable("finance_categories",{id:text("id").primaryKey(),farmId:text("farm_id").references(()=>farms.id),type:text("type").notNull(),name:text("name").notNull(),isSystem:integer("is_system",{mode:"boolean"}).notNull()});
-export const transactions=sqliteTable("transactions",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),plotId:text("plot_id").references(()=>plots.id),seasonId:text("season_id").references(()=>seasons.id),categoryId:text("category_id").notNull().references(()=>categories.id),workItemId:text("work_item_id").references(()=>workItems.id),type:text("type").notNull(),title:text("title").notNull(),amount:real("amount").notNull(),occurredOn:text("occurred_on").notNull(),receiptKey:text("receipt_key"),...audit},t=>[uniqueIndex("transactions_work_once_uq").on(t.workItemId),index("transactions_scope_idx").on(t.farmId,t.seasonId,t.occurredOn)]);
-export const workers=sqliteTable("workers",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),name:text("name").notNull(),payType:text("pay_type").notNull(),defaultRate:real("default_rate"),active:integer("active",{mode:"boolean"}).notNull(),...audit});
-export const laborEntries=sqliteTable("labor_entries",{id:text("id").primaryKey(),workerId:text("worker_id").notNull().references(()=>workers.id),workItemId:text("work_item_id").references(()=>workItems.id),workDate:text("work_date").notNull(),payType:text("pay_type").notNull(),quantity:real("quantity").notNull(),rate:real("rate").notNull(),amount:real("amount").notNull(),transactionId:text("transaction_id").references(()=>transactions.id),...audit},t=>[uniqueIndex("labor_entries_transaction_uq").on(t.transactionId),index("labor_entries_worker_date_idx").on(t.workerId,t.workDate)]);
+import {
+  integer,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/sqlite-core";
+const audit = {
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+};
+export const users = sqliteTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    ...audit,
+  },
+  (t) => [uniqueIndex("users_email_uq").on(t.email)],
+);
+export const localAccounts = sqliteTable(
+  "local_accounts",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    username: text("username").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    passwordSalt: text("password_salt").notNull(),
+    passwordIterations: integer("password_iterations").notNull(),
+    mustChangePassword: integer("must_change_password", {
+      mode: "boolean",
+    }).notNull(),
+    isActive: integer("is_active", { mode: "boolean" }).notNull(),
+    failedAttempts: integer("failed_attempts").notNull(),
+    lockedUntil: integer("locked_until", { mode: "timestamp" }),
+    lastLoginAt: integer("last_login_at", { mode: "timestamp" }),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("local_accounts_username_uq").on(t.username),
+    uniqueIndex("local_accounts_user_uq").on(t.userId),
+  ],
+);
+export const appSessions = sqliteTable(
+  "app_sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+    lastSeenAt: integer("last_seen_at", { mode: "timestamp" }).notNull(),
+    revokedAt: integer("revoked_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("app_sessions_token_uq").on(t.tokenHash),
+    index("app_sessions_user_expiry_idx").on(t.userId, t.expiresAt),
+  ],
+);
+export const userPermissions = sqliteTable(
+  "user_permissions",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    permissionKey: text("permission_key").notNull(),
+    allowed: integer("allowed", { mode: "boolean" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("user_permissions_scope_uq").on(
+      t.farmId,
+      t.userId,
+      t.permissionKey,
+    ),
+    index("user_permissions_user_idx").on(t.userId),
+  ],
+);
+export const recoveryCodes = sqliteTable(
+  "recovery_codes",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    codeHash: text("code_hash").notNull(),
+    usedAt: integer("used_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("recovery_codes_hash_uq").on(t.codeHash),
+    index("recovery_codes_user_idx").on(t.userId),
+  ],
+);
+export const farmMembers = sqliteTable(
+  "farm_members",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    role: text("role").notNull(),
+    plotScopeId: text("plot_scope_id"),
+    status: text("status").notNull(),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("farm_members_farm_user_uq").on(t.farmId, t.userId),
+    index("farm_members_user_idx").on(t.userId),
+  ],
+);
+export const userInvitations = sqliteTable(
+  "user_invitations",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    email: text("email").notNull(),
+    role: text("role").notNull(),
+    plotScopeId: text("plot_scope_id"),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+    acceptedAt: integer("accepted_at", { mode: "timestamp" }),
+    invitedBy: text("invited_by")
+      .notNull()
+      .references(() => users.id),
+    ...audit,
+  },
+  (t) => [index("invitations_farm_email_idx").on(t.farmId, t.email)],
+);
+export const auditLogs = sqliteTable(
+  "audit_logs",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => users.id),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id"),
+    detailJson: text("detail_json"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [index("audit_farm_date_idx").on(t.farmId, t.createdAt)],
+);
+export const farms = sqliteTable(
+  "farms",
+  {
+    id: text("id").primaryKey(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => users.id),
+    code: text("code"),
+    name: text("name").notNull(),
+    address: text("address"),
+    areaRai: real("area_rai"),
+    ...audit,
+  },
+  (t) => [
+    index("farms_owner_idx").on(t.ownerId),
+    uniqueIndex("farms_code_uq").on(t.code),
+  ],
+);
+export const farmSettings = sqliteTable(
+  "farm_settings",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    siteName: text("site_name").notNull(),
+    mascotName: text("mascot_name").notNull(),
+    ownerName: text("owner_name"),
+    timezone: text("timezone").notNull(),
+    dateFormat: text("date_format").notNull(),
+    currency: text("currency").notNull(),
+    areaUnit: text("area_unit").notNull(),
+    weightUnit: text("weight_unit").notNull(),
+    volumeUnit: text("volume_unit").notNull(),
+    defaultTankLiters: real("default_tank_liters").notNull(),
+    farmCodePrefix: text("farm_code_prefix").notNull(),
+    plotCodePrefix: text("plot_code_prefix").notNull(),
+    treeCodePrefix: text("tree_code_prefix").notNull(),
+    customCategoriesJson: text("custom_categories_json"),
+    customUnitsJson: text("custom_units_json"),
+    logoKey: text("logo_key"),
+    ...audit,
+  },
+  (t) => [uniqueIndex("farm_settings_farm_uq").on(t.farmId)],
+);
+export const plots = sqliteTable(
+  "plots",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    code: text("code"),
+    name: text("name").notNull(),
+    areaRai: real("area_rai"),
+    geoJson: text("geo_json"),
+    note: text("note"),
+    ...audit,
+  },
+  (t) => [
+    index("plots_farm_idx").on(t.farmId),
+    uniqueIndex("plots_farm_code_uq").on(t.farmId, t.code),
+  ],
+);
+export const seasons = sqliteTable(
+  "seasons",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    name: text("name").notNull(),
+    startDate: text("start_date").notNull(),
+    endDate: text("end_date"),
+    status: text("status").notNull(),
+    targetKg: real("target_kg"),
+    budget: real("budget"),
+    actualKg: real("actual_kg"),
+    summary: text("summary"),
+    closedAt: integer("closed_at", { mode: "timestamp" }),
+    closedBy: text("closed_by").references(() => users.id),
+    ...audit,
+  },
+  (t) => [index("seasons_farm_idx").on(t.farmId)],
+);
+export const seasonStages = sqliteTable(
+  "season_stages",
+  {
+    id: text("id").primaryKey(),
+    seasonId: text("season_id")
+      .notNull()
+      .references(() => seasons.id),
+    name: text("name").notNull(),
+    sequence: integer("sequence").notNull(),
+    status: text("status").notNull(),
+    startedOn: text("started_on"),
+    completedOn: text("completed_on"),
+    note: text("note"),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("season_stages_order_uq").on(t.seasonId, t.sequence),
+    index("season_stages_season_idx").on(t.seasonId),
+  ],
+);
+export const trees = sqliteTable(
+  "trees",
+  {
+    id: text("id").primaryKey(),
+    durianId: text("durian_id").notNull(),
+    plotId: text("plot_id")
+      .notNull()
+      .references(() => plots.id),
+    variety: text("variety").notNull(),
+    plantedAt: text("planted_at"),
+    status: text("status").notNull(),
+    productionStage: text("production_stage"),
+    qrKey: text("qr_key").notNull(),
+    photoKey: text("photo_key"),
+    note: text("note"),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("trees_durian_id_uq").on(t.durianId),
+    index("trees_plot_idx").on(t.plotId),
+  ],
+);
+export const treeEvents = sqliteTable(
+  "tree_events",
+  {
+    id: text("id").primaryKey(),
+    treeId: text("tree_id")
+      .notNull()
+      .references(() => trees.id),
+    eventType: text("event_type").notNull(),
+    note: text("note"),
+    photoKey: text("photo_key"),
+    eventAt: integer("event_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [index("tree_events_tree_date_idx").on(t.treeId, t.eventAt)],
+);
+export const workItems = sqliteTable(
+  "work_items",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    plotId: text("plot_id").references(() => plots.id),
+    treeId: text("tree_id").references(() => trees.id),
+    seasonId: text("season_id").references(() => seasons.id),
+    title: text("title").notNull(),
+    description: text("description"),
+    workType: text("work_type").notNull(),
+    priority: text("priority").notNull().default("normal"),
+    status: text("status").notNull(),
+    scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+    completedAt: integer("completed_at", { mode: "timestamp" }),
+    assigneeId: text("assignee_id").references(() => users.id),
+    createdBy: text("created_by").references(() => users.id),
+    tankLiters: real("tank_liters"),
+    tankCount: real("tank_count"),
+    actualTankCount: real("actual_tank_count"),
+    ...audit,
+  },
+  (t) => [index("work_schedule_idx").on(t.farmId, t.scheduledAt)],
+);
+export const workMaterialPlans = sqliteTable(
+  "work_material_plans",
+  {
+    id: text("id").primaryKey(),
+    workItemId: text("work_item_id")
+      .notNull()
+      .references(() => workItems.id),
+    productName: text("product_name").notNull(),
+    productKind: text("product_kind").notNull(),
+    brand: text("brand"),
+    commonName: text("common_name"),
+    ratePer200l: real("rate_per_200l").notNull(),
+    rateUnit: text("rate_unit").notNull(),
+    tankCount: real("tank_count").notNull(),
+    plannedQuantity: real("planned_quantity").notNull(),
+    actualQuantity: real("actual_quantity"),
+    stockProductId: text("stock_product_id").references(() => products.id),
+    ...audit,
+  },
+  (t) => [index("work_materials_work_idx").on(t.workItemId)],
+);
+export const categories = sqliteTable("finance_categories", {
+  id: text("id").primaryKey(),
+  farmId: text("farm_id").references(() => farms.id),
+  type: text("type").notNull(),
+  name: text("name").notNull(),
+  isSystem: integer("is_system", { mode: "boolean" }).notNull(),
+});
+export const transactions = sqliteTable(
+  "transactions",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    plotId: text("plot_id").references(() => plots.id),
+    seasonId: text("season_id").references(() => seasons.id),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => categories.id),
+    workItemId: text("work_item_id").references(() => workItems.id),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    amount: real("amount").notNull(),
+    occurredOn: text("occurred_on").notNull(),
+    receiptKey: text("receipt_key"),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("transactions_work_once_uq").on(t.workItemId),
+    index("transactions_scope_idx").on(t.farmId, t.seasonId, t.occurredOn),
+  ],
+);
+export const workers = sqliteTable("workers", {
+  id: text("id").primaryKey(),
+  farmId: text("farm_id")
+    .notNull()
+    .references(() => farms.id),
+  name: text("name").notNull(),
+  payType: text("pay_type").notNull(),
+  defaultRate: real("default_rate"),
+  active: integer("active", { mode: "boolean" }).notNull(),
+  ...audit,
+});
+export const laborEntries = sqliteTable(
+  "labor_entries",
+  {
+    id: text("id").primaryKey(),
+    workerId: text("worker_id")
+      .notNull()
+      .references(() => workers.id),
+    workItemId: text("work_item_id").references(() => workItems.id),
+    workDate: text("work_date").notNull(),
+    payType: text("pay_type").notNull(),
+    quantity: real("quantity").notNull(),
+    rate: real("rate").notNull(),
+    amount: real("amount").notNull(),
+    transactionId: text("transaction_id").references(() => transactions.id),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("labor_entries_transaction_uq").on(t.transactionId),
+    index("labor_entries_worker_date_idx").on(t.workerId, t.workDate),
+  ],
+);
 // Phase 2: ปุ๋ย ยา สาร/ฮอร์โมน ธาตุอาหาร และวัสดุสิ้นเปลือง
-export const products=sqliteTable("products",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),sku:text("sku").notNull(),name:text("name").notNull(),kind:text("kind").notNull(),brand:text("brand"),commonName:text("common_name"),formulation:text("formulation"),registrationNo:text("registration_no"),packageSize:real("package_size"),packageUnit:text("package_unit"),defaultRatePer200l:real("default_rate_per_200l"),rateUnit:text("rate_unit"),unit:text("unit").notNull(),minimumStock:real("minimum_stock"),active:integer("active",{mode:"boolean"}).notNull(),...audit},t=>[uniqueIndex("products_farm_sku_uq").on(t.farmId,t.sku)]);
-export const stockLots=sqliteTable("stock_lots",{id:text("id").primaryKey(),productId:text("product_id").notNull().references(()=>products.id),lotNo:text("lot_no"),expiresOn:text("expires_on"),unitCost:real("unit_cost").notNull(),receivedQty:real("received_qty").notNull(),remainingQty:real("remaining_qty").notNull(),supplier:text("supplier"),...audit},t=>[index("stock_lots_product_expiry_idx").on(t.productId,t.expiresOn)]);
-export const stockMovements=sqliteTable("stock_movements",{id:text("id").primaryKey(),lotId:text("lot_id").notNull().references(()=>stockLots.id),workItemId:text("work_item_id").references(()=>workItems.id),transactionId:text("transaction_id").references(()=>transactions.id),plotId:text("plot_id").references(()=>plots.id),seasonId:text("season_id").references(()=>seasons.id),movementType:text("movement_type").notNull(),quantity:real("quantity").notNull(),occurredAt:integer("occurred_at",{mode:"timestamp"}).notNull(),note:text("note")},t=>[index("stock_movements_lot_date_idx").on(t.lotId,t.occurredAt)]);
-export const purchaseReceipts=sqliteTable("purchase_receipts",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),supplier:text("supplier").notNull(),invoiceNo:text("invoice_no"),purchasedOn:text("purchased_on").notNull(),subtotal:real("subtotal").notNull(),discount:real("discount").notNull(),totalAmount:real("total_amount").notNull(),transactionId:text("transaction_id").notNull().references(()=>transactions.id),receiptKey:text("receipt_key"),createdBy:text("created_by").notNull().references(()=>users.id),...audit},t=>[uniqueIndex("purchase_receipts_transaction_uq").on(t.transactionId),index("purchase_receipts_farm_date_idx").on(t.farmId,t.purchasedOn)]);
-export const purchaseLines=sqliteTable("purchase_lines",{id:text("id").primaryKey(),purchaseId:text("purchase_id").notNull().references(()=>purchaseReceipts.id),productId:text("product_id").notNull().references(()=>products.id),lotId:text("lot_id").notNull().references(()=>stockLots.id),packageQty:real("package_qty").notNull(),packageSize:real("package_size").notNull(),packageUnit:text("package_unit").notNull(),unitPrice:real("unit_price").notNull(),lineTotal:real("line_total").notNull()},t=>[index("purchase_lines_purchase_idx").on(t.purchaseId)]);
+export const products = sqliteTable(
+  "products",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    sku: text("sku").notNull(),
+    name: text("name").notNull(),
+    kind: text("kind").notNull(),
+    brand: text("brand"),
+    commonName: text("common_name"),
+    formulation: text("formulation"),
+    registrationNo: text("registration_no"),
+    packageSize: real("package_size"),
+    packageUnit: text("package_unit"),
+    defaultRatePer200l: real("default_rate_per_200l"),
+    rateUnit: text("rate_unit"),
+    unit: text("unit").notNull(),
+    minimumStock: real("minimum_stock"),
+    active: integer("active", { mode: "boolean" }).notNull(),
+    ...audit,
+  },
+  (t) => [uniqueIndex("products_farm_sku_uq").on(t.farmId, t.sku)],
+);
+export const stockLots = sqliteTable(
+  "stock_lots",
+  {
+    id: text("id").primaryKey(),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id),
+    lotNo: text("lot_no"),
+    expiresOn: text("expires_on"),
+    unitCost: real("unit_cost").notNull(),
+    receivedQty: real("received_qty").notNull(),
+    remainingQty: real("remaining_qty").notNull(),
+    supplier: text("supplier"),
+    ...audit,
+  },
+  (t) => [index("stock_lots_product_expiry_idx").on(t.productId, t.expiresOn)],
+);
+export const stockMovements = sqliteTable(
+  "stock_movements",
+  {
+    id: text("id").primaryKey(),
+    lotId: text("lot_id")
+      .notNull()
+      .references(() => stockLots.id),
+    workItemId: text("work_item_id").references(() => workItems.id),
+    workMaterialPlanId: text("work_material_plan_id").references(
+      () => workMaterialPlans.id,
+    ),
+    transactionId: text("transaction_id").references(() => transactions.id),
+    plotId: text("plot_id").references(() => plots.id),
+    seasonId: text("season_id").references(() => seasons.id),
+    movementType: text("movement_type").notNull(),
+    quantity: real("quantity").notNull(),
+    occurredAt: integer("occurred_at", { mode: "timestamp" }).notNull(),
+    note: text("note"),
+  },
+  (t) => [
+    index("stock_movements_lot_date_idx").on(t.lotId, t.occurredAt),
+    index("stock_movements_work_material_idx").on(t.workMaterialPlanId),
+  ],
+);
+export const purchaseReceipts = sqliteTable(
+  "purchase_receipts",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    supplier: text("supplier").notNull(),
+    invoiceNo: text("invoice_no"),
+    purchasedOn: text("purchased_on").notNull(),
+    subtotal: real("subtotal").notNull(),
+    discount: real("discount").notNull(),
+    totalAmount: real("total_amount").notNull(),
+    transactionId: text("transaction_id")
+      .notNull()
+      .references(() => transactions.id),
+    receiptKey: text("receipt_key"),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("purchase_receipts_transaction_uq").on(t.transactionId),
+    index("purchase_receipts_farm_date_idx").on(t.farmId, t.purchasedOn),
+  ],
+);
+export const purchaseLines = sqliteTable(
+  "purchase_lines",
+  {
+    id: text("id").primaryKey(),
+    purchaseId: text("purchase_id")
+      .notNull()
+      .references(() => purchaseReceipts.id),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id),
+    lotId: text("lot_id")
+      .notNull()
+      .references(() => stockLots.id),
+    packageQty: real("package_qty").notNull(),
+    packageSize: real("package_size").notNull(),
+    packageUnit: text("package_unit").notNull(),
+    unitPrice: real("unit_price").notNull(),
+    lineTotal: real("line_total").notNull(),
+  },
+  (t) => [index("purchase_lines_purchase_idx").on(t.purchaseId)],
+);
 // Phase 4: weather, sensors, plant-health observations, and alerts.
-export const sensorDevices=sqliteTable("sensor_devices",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),plotId:text("plot_id").references(()=>plots.id),name:text("name").notNull(),deviceType:text("device_type").notNull(),unit:text("unit").notNull(),status:text("status").notNull(),lastSeenAt:integer("last_seen_at",{mode:"timestamp"}),...audit},t=>[index("sensor_devices_farm_idx").on(t.farmId)]);
-export const sensorReadings=sqliteTable("sensor_readings",{id:text("id").primaryKey(),deviceId:text("device_id").notNull().references(()=>sensorDevices.id),value:real("value").notNull(),recordedAt:integer("recorded_at",{mode:"timestamp"}).notNull()},t=>[index("sensor_readings_device_date_idx").on(t.deviceId,t.recordedAt)]);
-export const plantHealthObservations=sqliteTable("plant_health_observations",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),plotId:text("plot_id").references(()=>plots.id),treeId:text("tree_id").references(()=>trees.id),observationType:text("observation_type").notNull(),severity:text("severity").notNull(),symptom:text("symptom").notNull(),note:text("note"),photoKey:text("photo_key"),status:text("status").notNull(),observedBy:text("observed_by").notNull().references(()=>users.id),observedAt:integer("observed_at",{mode:"timestamp"}).notNull(),...audit},t=>[index("health_observations_farm_status_idx").on(t.farmId,t.status)]);
-export const smartAlerts=sqliteTable("smart_alerts",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),plotId:text("plot_id").references(()=>plots.id),alertType:text("alert_type").notNull(),severity:text("severity").notNull(),title:text("title").notNull(),detail:text("detail"),recommendedAction:text("recommended_action"),status:text("status").notNull(),triggeredAt:integer("triggered_at",{mode:"timestamp"}).notNull(),resolvedAt:integer("resolved_at",{mode:"timestamp"}),...audit},t=>[index("smart_alerts_farm_status_idx").on(t.farmId,t.status)]);
+export const sensorDevices = sqliteTable(
+  "sensor_devices",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    plotId: text("plot_id").references(() => plots.id),
+    name: text("name").notNull(),
+    deviceType: text("device_type").notNull(),
+    unit: text("unit").notNull(),
+    status: text("status").notNull(),
+    lastSeenAt: integer("last_seen_at", { mode: "timestamp" }),
+    ...audit,
+  },
+  (t) => [index("sensor_devices_farm_idx").on(t.farmId)],
+);
+export const sensorReadings = sqliteTable(
+  "sensor_readings",
+  {
+    id: text("id").primaryKey(),
+    deviceId: text("device_id")
+      .notNull()
+      .references(() => sensorDevices.id),
+    value: real("value").notNull(),
+    recordedAt: integer("recorded_at", { mode: "timestamp" }).notNull(),
+  },
+  (t) => [
+    index("sensor_readings_device_date_idx").on(t.deviceId, t.recordedAt),
+  ],
+);
+export const plantHealthObservations = sqliteTable(
+  "plant_health_observations",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    plotId: text("plot_id").references(() => plots.id),
+    treeId: text("tree_id").references(() => trees.id),
+    observationType: text("observation_type").notNull(),
+    severity: text("severity").notNull(),
+    symptom: text("symptom").notNull(),
+    note: text("note"),
+    photoKey: text("photo_key"),
+    status: text("status").notNull(),
+    observedBy: text("observed_by")
+      .notNull()
+      .references(() => users.id),
+    observedAt: integer("observed_at", { mode: "timestamp" }).notNull(),
+    ...audit,
+  },
+  (t) => [index("health_observations_farm_status_idx").on(t.farmId, t.status)],
+);
+export const smartAlerts = sqliteTable(
+  "smart_alerts",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    plotId: text("plot_id").references(() => plots.id),
+    alertType: text("alert_type").notNull(),
+    severity: text("severity").notNull(),
+    title: text("title").notNull(),
+    detail: text("detail"),
+    recommendedAction: text("recommended_action"),
+    status: text("status").notNull(),
+    triggeredAt: integer("triggered_at", { mode: "timestamp" }).notNull(),
+    resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+    ...audit,
+  },
+  (t) => [index("smart_alerts_farm_status_idx").on(t.farmId, t.status)],
+);
 // Phase 5: harvest batches, grading, traceability, and sales linked to accounting.
-export const harvestBatches=sqliteTable("harvest_batches",{id:text("id").primaryKey(),farmId:text("farm_id").notNull().references(()=>farms.id),plotId:text("plot_id").references(()=>plots.id),seasonId:text("season_id").references(()=>seasons.id),lotCode:text("lot_code").notNull(),variety:text("variety").notNull(),harvestedOn:text("harvested_on").notNull(),totalWeightKg:real("total_weight_kg").notNull(),fruitCount:integer("fruit_count").notNull(),status:text("status").notNull(),traceKey:text("trace_key").notNull(),createdBy:text("created_by").notNull().references(()=>users.id),...audit},t=>[uniqueIndex("harvest_batches_lot_uq").on(t.lotCode),uniqueIndex("harvest_batches_trace_uq").on(t.traceKey),index("harvest_batches_farm_date_idx").on(t.farmId,t.harvestedOn)]);
-export const harvestBatchTrees=sqliteTable("harvest_batch_trees",{id:text("id").primaryKey(),batchId:text("batch_id").notNull().references(()=>harvestBatches.id),treeId:text("tree_id").notNull().references(()=>trees.id),weightKg:real("weight_kg"),fruitCount:integer("fruit_count")},t=>[uniqueIndex("harvest_batch_tree_uq").on(t.batchId,t.treeId)]);
-export const harvestGrades=sqliteTable("harvest_grades",{id:text("id").primaryKey(),batchId:text("batch_id").notNull().references(()=>harvestBatches.id),grade:text("grade").notNull(),weightKg:real("weight_kg").notNull(),fruitCount:integer("fruit_count"),note:text("note"),...audit},t=>[uniqueIndex("harvest_grades_batch_grade_uq").on(t.batchId,t.grade)]);
-export const produceSales=sqliteTable("produce_sales",{id:text("id").primaryKey(),batchId:text("batch_id").notNull().references(()=>harvestBatches.id),buyerName:text("buyer_name").notNull(),weightKg:real("weight_kg").notNull(),pricePerKg:real("price_per_kg").notNull(),totalAmount:real("total_amount").notNull(),deliveryOn:text("delivery_on"),status:text("status").notNull(),transactionId:text("transaction_id").references(()=>transactions.id),...audit},t=>[uniqueIndex("produce_sales_transaction_uq").on(t.transactionId),index("produce_sales_batch_idx").on(t.batchId)]);
+export const harvestBatches = sqliteTable(
+  "harvest_batches",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    plotId: text("plot_id").references(() => plots.id),
+    seasonId: text("season_id").references(() => seasons.id),
+    lotCode: text("lot_code").notNull(),
+    variety: text("variety").notNull(),
+    harvestedOn: text("harvested_on").notNull(),
+    totalWeightKg: real("total_weight_kg").notNull(),
+    fruitCount: integer("fruit_count").notNull(),
+    status: text("status").notNull(),
+    traceKey: text("trace_key").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("harvest_batches_lot_uq").on(t.lotCode),
+    uniqueIndex("harvest_batches_trace_uq").on(t.traceKey),
+    index("harvest_batches_farm_date_idx").on(t.farmId, t.harvestedOn),
+  ],
+);
+export const harvestBatchTrees = sqliteTable(
+  "harvest_batch_trees",
+  {
+    id: text("id").primaryKey(),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => harvestBatches.id),
+    treeId: text("tree_id")
+      .notNull()
+      .references(() => trees.id),
+    weightKg: real("weight_kg"),
+    fruitCount: integer("fruit_count"),
+  },
+  (t) => [uniqueIndex("harvest_batch_tree_uq").on(t.batchId, t.treeId)],
+);
+export const harvestGrades = sqliteTable(
+  "harvest_grades",
+  {
+    id: text("id").primaryKey(),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => harvestBatches.id),
+    grade: text("grade").notNull(),
+    weightKg: real("weight_kg").notNull(),
+    fruitCount: integer("fruit_count"),
+    note: text("note"),
+    ...audit,
+  },
+  (t) => [uniqueIndex("harvest_grades_batch_grade_uq").on(t.batchId, t.grade)],
+);
+export const produceSales = sqliteTable(
+  "produce_sales",
+  {
+    id: text("id").primaryKey(),
+    batchId: text("batch_id")
+      .notNull()
+      .references(() => harvestBatches.id),
+    buyerName: text("buyer_name").notNull(),
+    weightKg: real("weight_kg").notNull(),
+    pricePerKg: real("price_per_kg").notNull(),
+    totalAmount: real("total_amount").notNull(),
+    deliveryOn: text("delivery_on"),
+    status: text("status").notNull(),
+    transactionId: text("transaction_id").references(() => transactions.id),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("produce_sales_transaction_uq").on(t.transactionId),
+    index("produce_sales_batch_idx").on(t.batchId),
+  ],
+);
