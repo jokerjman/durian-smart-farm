@@ -1,2 +1,50 @@
-import {env} from "cloudflare:workers";import {audit,id,now,permit,requireSession} from "@/lib/authz";
-export async function POST(req:Request){try{const s=await requireSession();permit(s,["owner","admin","supervisor","worker"]);const b=await req.json() as {title?:string;workType?:string;tankCount?:number;assignee?:string;plot?:string;materials?:Array<{name:string;kind:string;rate:number;unit:string}>};if(!b.title?.trim())return Response.json({error:"กรุณาระบุชื่องาน"},{status:400});if(b.materials?.length&&!['owner','admin','supervisor'].includes(s.role))return Response.json({error:"เฉพาะเจ้าของสวนหรือผู้จัดการที่กำหนดสูตรผสมได้"},{status:403});const taskId=id("work"),ts=now(),tanks=Math.max(1,Number(b.tankCount)||1);const statements=[env.DB!.prepare("INSERT INTO work_items (id,farm_id,plot_id,tree_id,season_id,title,work_type,status,scheduled_at,assignee_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(taskId,s.farmId,null,null,null,b.title.trim(),b.workType||"general","planned",ts,s.userId,ts,ts)];for(const m of b.materials||[]){if(!m.name||!(m.rate>0))continue;statements.push(env.DB!.prepare("INSERT INTO work_material_plans (id,work_item_id,product_name,product_kind,rate_per_200l,rate_unit,tank_count,planned_quantity,stock_product_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id("material"),taskId,m.name,m.kind,Number(m.rate),m.unit,tanks,Number(m.rate)*tanks,null,ts,ts))}await env.DB!.batch(statements);await audit(s,"create","work_item",taskId,{title:b.title,tankCount:tanks,materials:b.materials,assignee:b.assignee,plot:b.plot});return Response.json({id:taskId,saved:true,plannedMaterials:(b.materials||[]).map(m=>({...m,total:Number(m.rate)*tanks}))})}catch(e){return e instanceof Response?e:Response.json({error:"บันทึกงานไม่สำเร็จ"},{status:500})}}
+import {env} from "cloudflare:workers";
+import {assertSameOrigin,audit,id,now,requireSession} from "@/lib/authz";
+
+const clean=(value:unknown,max=500)=>String(value??"").trim().slice(0,max);
+const may=(s:{role:string;permissions:string[]},key:string)=>s.role==="admin"||s.permissions.includes("*")||s.permissions.includes(key);
+const scheduled=(value:unknown)=>{if(typeof value==="number")return Math.floor(value);const parsed=Date.parse(String(value||""));return Number.isFinite(parsed)?Math.floor(parsed/1000):now()};
+
+export async function GET(){
+ try{
+  const s=await requireSession();if(!may(s,"work.view")&&!may(s,"work.manage"))throw new Response("ไม่มีสิทธิ์ดำเนินการ",{status:403});
+  const tasks=await env.DB!.prepare(`SELECT w.id,w.farm_id AS farmId,w.plot_id AS plotId,w.season_id AS seasonId,w.title,w.description,w.work_type AS workType,w.priority,w.status,w.scheduled_at AS scheduledAt,w.completed_at AS completedAt,w.assignee_id AS assigneeId,w.tank_liters AS tankLiters,w.tank_count AS tankCount,w.actual_tank_count AS actualTankCount,p.name AS plotName,u.name AS assigneeName,se.name AS seasonName
+   FROM work_items w LEFT JOIN plots p ON p.id=w.plot_id LEFT JOIN users u ON u.id=w.assignee_id LEFT JOIN seasons se ON se.id=w.season_id
+   JOIN farm_members access ON access.farm_id=w.farm_id AND access.user_id=? AND access.status='active'
+   ORDER BY CASE w.status WHEN 'planned' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,w.scheduled_at DESC`).bind(s.userId).all();
+  const taskIds=(tasks.results||[]).map((x:any)=>x.id);let materials:any[]=[];if(taskIds.length){const marks=taskIds.map(()=>"?").join(",");materials=(await env.DB!.prepare(`SELECT id,work_item_id AS workItemId,product_name AS productName,product_kind AS productKind,brand,common_name AS commonName,rate_per_200l AS ratePer200l,rate_unit AS rateUnit,tank_count AS tankCount,planned_quantity AS plannedQuantity,actual_quantity AS actualQuantity,stock_product_id AS stockProductId FROM work_material_plans WHERE work_item_id IN (${marks}) ORDER BY created_at`).bind(...taskIds).all()).results||[]}
+  const plots=await env.DB!.prepare("SELECT p.id,p.name,p.farm_id AS farmId,f.name AS farmName FROM plots p JOIN farms f ON f.id=p.farm_id JOIN farm_members fm ON fm.farm_id=f.id AND fm.user_id=? AND fm.status='active' ORDER BY f.name,p.name").bind(s.userId).all();
+  const members=await env.DB!.prepare("SELECT DISTINCT u.id,u.name FROM users u JOIN farm_members fm ON fm.user_id=u.id JOIN farm_members access ON access.farm_id=fm.farm_id AND access.user_id=? AND access.status='active' JOIN local_accounts a ON a.user_id=u.id AND a.is_active=1 WHERE fm.status='active' ORDER BY u.name").bind(s.userId).all();
+  const seasons=await env.DB!.prepare("SELECT se.id,se.farm_id AS farmId,se.name FROM seasons se JOIN farm_members fm ON fm.farm_id=se.farm_id AND fm.user_id=? AND fm.status='active' WHERE se.status IN ('current','active','in_progress')").bind(s.userId).all();
+  const settings=await env.DB!.prepare("SELECT default_tank_liters AS defaultTankLiters FROM farm_settings WHERE farm_id=?").bind(s.farmId).first();
+  return Response.json({tasks:tasks.results||[],materials,plots:plots.results||[],members:members.results||[],seasons:seasons.results||[],defaultTankLiters:Number((settings as any)?.defaultTankLiters||200)});
+ }catch(e){return e instanceof Response?e:Response.json({error:"โหลดข้อมูลงานไม่สำเร็จ"},{status:500})}
+}
+
+export async function POST(req:Request){
+ try{
+  assertSameOrigin(req);const s=await requireSession();if(!may(s,"work.manage"))throw new Response("ไม่มีสิทธิ์สร้างหรือมอบหมายงาน",{status:403});const b=await req.json() as Record<string,any>,title=clean(b.title,160),farmId=clean(b.farmId||s.farmId,80),plotId=clean(b.plotId,80)||null;
+  if(!title)return Response.json({error:"กรุณาระบุชื่องาน"},{status:400});
+  if(!await env.DB!.prepare("SELECT 1 FROM farm_members WHERE farm_id=? AND user_id=? AND status='active'").bind(farmId,s.userId).first())return Response.json({error:"ไม่มีสิทธิ์ในสวนนี้"},{status:403});
+  if(plotId&&!await env.DB!.prepare("SELECT 1 FROM plots WHERE id=? AND farm_id=?").bind(plotId,farmId).first())return Response.json({error:"แปลงไม่อยู่ในสวนที่เลือก"},{status:400});
+  const materials=Array.isArray(b.materials)?b.materials.filter((x:any)=>clean(x.productName||x.name,120)&&Number(x.ratePer200l??x.rate)>0).slice(0,30):[];
+  if(materials.length&&!may(s,"spray_formula.manage"))throw new Response("ไม่มีสิทธิ์กำหนดสูตรพ่น",{status:403});
+  const assigneeId=clean(b.assigneeId,80)||null;if(assigneeId&&!await env.DB!.prepare("SELECT 1 FROM farm_members WHERE farm_id=? AND user_id=? AND status='active'").bind(farmId,assigneeId).first())return Response.json({error:"ผู้รับผิดชอบไม่ได้อยู่ในสวนนี้"},{status:400});
+  let seasonId=clean(b.seasonId,80)||null;if(!seasonId)seasonId=(await env.DB!.prepare("SELECT id FROM seasons WHERE farm_id=? AND status IN ('current','active','in_progress') ORDER BY start_date DESC LIMIT 1").bind(farmId).first<{id:string}>())?.id||null;
+  const ts=now(),taskId=id("work"),tankLiters=Math.max(1,Number(b.tankLiters)||200),tankCount=Math.max(0,Number(b.tankCount)||0),workType=clean(b.workType,50)||"general";
+  const statements=[env.DB!.prepare("INSERT INTO work_items (id,farm_id,plot_id,tree_id,season_id,title,description,work_type,priority,status,scheduled_at,completed_at,assignee_id,created_by,tank_liters,tank_count,actual_tank_count,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(taskId,farmId,plotId,null,seasonId,title,clean(b.description)||null,workType,clean(b.priority,20)||"normal","planned",scheduled(b.scheduledAt),null,assigneeId,s.userId,materials.length?tankLiters:null,materials.length?tankCount:null,null,ts,ts)];
+  for(const m of materials){const rate=Number(m.ratePer200l??m.rate),factor=tankLiters/200,qty=rate*tankCount*factor;statements.push(env.DB!.prepare("INSERT INTO work_material_plans (id,work_item_id,product_name,product_kind,brand,common_name,rate_per_200l,rate_unit,tank_count,planned_quantity,actual_quantity,stock_product_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id("material"),taskId,clean(m.productName||m.name,120),clean(m.productKind||m.kind,50)||"อื่นๆ",clean(m.brand,100)||null,clean(m.commonName,120)||null,rate,clean(m.rateUnit||m.unit,20)||"มล.",tankCount,qty,null,clean(m.stockProductId,80)||null,ts,ts))}
+  await env.DB!.batch(statements);await audit(s,"create","work_item",taskId,{title,plotId,seasonId,assigneeId,workType,materialCount:materials.length});return Response.json({id:taskId},{status:201});
+ }catch(e){return e instanceof Response?e:Response.json({error:"บันทึกงานไม่สำเร็จ"},{status:500})}
+}
+
+export async function PATCH(req:Request){
+ try{
+  assertSameOrigin(req);const s=await requireSession();const b=await req.json() as Record<string,any>,taskId=clean(b.id,80);if(!taskId)return Response.json({error:"ไม่พบรหัสงาน"},{status:400});
+  const task=await env.DB!.prepare("SELECT w.id,w.farm_id AS farmId,w.assignee_id AS assigneeId,w.status,w.tank_count AS tankCount FROM work_items w JOIN farm_members fm ON fm.farm_id=w.farm_id AND fm.user_id=? AND fm.status='active' WHERE w.id=?").bind(s.userId,taskId).first<{id:string;farmId:string;assigneeId:string|null;status:string;tankCount:number|null}>();if(!task)return Response.json({error:"ไม่พบงาน"},{status:404});
+  if(!may(s,"work.manage")&&task.assigneeId!==s.userId)throw new Response("ไม่มีสิทธิ์แก้ไขงานนี้",{status:403});const status=["planned","in_progress","done","cancelled"].includes(b.status)?b.status:task.status,ts=now(),actualTanks=Math.max(0,Number(b.actualTankCount??task.tankCount)||0);
+  await env.DB!.prepare("UPDATE work_items SET status=?,completed_at=?,actual_tank_count=?,updated_at=? WHERE id=?").bind(status,status==="done"?ts:null,actualTanks||null,ts,taskId).run();
+  if(status==="done")await env.DB!.prepare("UPDATE work_material_plans SET actual_quantity=rate_per_200l*?*(COALESCE((SELECT tank_liters FROM work_items WHERE id=?),200)/200),updated_at=? WHERE work_item_id=?").bind(actualTanks,taskId,ts,taskId).run();
+  await audit(s,"update_status","work_item",taskId,{status,actualTankCount:actualTanks});return Response.json({ok:true});
+ }catch(e){return e instanceof Response?e:Response.json({error:"อัปเดตงานไม่สำเร็จ"},{status:500})}
+}
