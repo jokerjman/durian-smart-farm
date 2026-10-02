@@ -78,6 +78,13 @@
       "when": 1790869978918,
       "tag": "0010_furry_earthquake",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1790907437761,
+      "tag": "0011_fine_the_watchers",
+      "breakpoints": true
     }
   ]
 }

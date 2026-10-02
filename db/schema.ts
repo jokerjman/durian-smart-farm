@@ -682,3 +682,31 @@ export const produceSales = sqliteTable(
     index("produce_sales_batch_idx").on(t.batchId),
   ],
 );
+// Phase 8: GAP self-assessment evidence and history by production season.
+export const gapAssessments = sqliteTable(
+  "gap_assessments",
+  {
+    id: text("id").primaryKey(),
+    farmId: text("farm_id")
+      .notNull()
+      .references(() => farms.id),
+    seasonId: text("season_id").references(() => seasons.id),
+    itemKey: text("item_key").notNull(),
+    status: text("status").notNull(),
+    note: text("note"),
+    evidenceKey: text("evidence_key"),
+    reviewedBy: text("reviewed_by")
+      .notNull()
+      .references(() => users.id),
+    reviewedAt: integer("reviewed_at", { mode: "timestamp" }).notNull(),
+    ...audit,
+  },
+  (t) => [
+    uniqueIndex("gap_assessments_scope_item_uq").on(
+      t.farmId,
+      t.seasonId,
+      t.itemKey,
+    ),
+    index("gap_assessments_farm_season_idx").on(t.farmId, t.seasonId),
+  ],
+);

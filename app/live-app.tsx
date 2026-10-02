@@ -27,6 +27,7 @@ import { WorkCalendarPage } from "./p4-pages";
 import { FinancePage, InventoryPage } from "./p5-pages";
 import { HarvestPage } from "./p6-pages";
 import { SmartFarmPage } from "./p7-pages";
+import { ReportsPage } from "./p8-pages";
 
 type Session = {
   userId: string;
@@ -181,33 +182,10 @@ export default function LiveApp({ session }: { session: Session }) {
     if (tab === "money") return <FinancePage refreshOverview={load} />;
     if (tab === "harvest") return <HarvestPage refreshOverview={load} />;
     if (tab === "smart") return <SmartFarmPage />;
+    if (tab === "report") return <ReportsPage />;
     if (tab === "users") return <UsersPage />;
     if (tab === "settings") return <SettingsPage saved={load} />;
-    const copy: Record<
-      Exclude<
-        Tab,
-        | "today"
-        | "farms"
-        | "trees"
-        | "work"
-        | "season"
-        | "smart"
-        | "harvest"
-        | "money"
-        | "stock"
-        | "users"
-        | "settings"
-      >,
-      [string, string, string]
-    > = {
-      report: [
-        "วิเคราะห์ & GAP",
-        "ยังไม่มีข้อมูลเพียงพอสำหรับรายงาน",
-        "รายงานจะคำนวณจากข้อมูลจริงและประวัติฤดูใน P8",
-      ],
-    };
-    const [title, headline, detail] = copy[tab];
-    return <EmptyPage title={title} headline={headline} detail={detail} />;
+    return null;
   }, [tab, data, farm, session]);
   return (
     <div className="shell live-shell">
@@ -275,22 +253,16 @@ export default function LiveApp({ session }: { session: Session }) {
         </section>
       </main>
       <div className="mobile-nav">
-        {visible
-          .filter(([id]) =>
-            ["today", "farms", "work", "smart", "money", "settings"].includes(
-              id,
-            ),
-          )
-          .map(([id, label, I]) => (
-            <button
-              className={tab === id ? "active" : ""}
-              onClick={() => setTab(id)}
-              key={id}
-            >
-              <I />
-              <span>{label.split(" ")[0]}</span>
-            </button>
-          ))}
+        {visible.map(([id, label, I]) => (
+          <button
+            className={tab === id ? "active" : ""}
+            onClick={() => setTab(id)}
+            key={id}
+          >
+            <I />
+            <span>{label.split(" ")[0]}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
