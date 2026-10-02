@@ -1,2 +1,9 @@
-import {env} from "cloudflare:workers";import {audit,id,now,permit,requireSession} from "@/lib/authz";
-export async function POST(req:Request){try{const s=await requireSession();permit(s,["owner","admin"]);const b=await req.json() as {email?:string;role?:string;scope?:string};if(!b.email?.includes("@"))return Response.json({error:"อีเมลไม่ถูกต้อง"},{status:400});const invitationId=id("invite"),ts=now();await env.DB!.prepare("INSERT INTO user_invitations (id,farm_id,email,role,plot_scope_id,token_hash,expires_at,accepted_at,invited_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(invitationId,s.farmId,b.email.toLowerCase(),b.role||"viewer",b.scope||null,crypto.randomUUID(),ts+604800,null,s.userId,ts,ts).run();await audit(s,"invite","user_invitation",invitationId,{email:b.email,role:b.role});return Response.json({id:invitationId,status:"pending"})}catch(e){return e instanceof Response?e:Response.json({error:"สร้างคำเชิญไม่สำเร็จ"},{status:500})}}
+export async function POST() {
+  return Response.json(
+    {
+      error:
+        "ระบบไม่ใช้คำเชิญทางอีเมล กรุณาให้ Admin สร้างชื่อผู้ใช้และรหัสผ่าน",
+    },
+    { status: 410 },
+  );
+}

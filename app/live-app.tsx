@@ -28,6 +28,7 @@ import { FinancePage, InventoryPage } from "./p5-pages";
 import { HarvestPage } from "./p6-pages";
 import { SmartFarmPage } from "./p7-pages";
 import { ReportsPage } from "./p8-pages";
+import { AdminUsersPage } from "./p9-pages";
 
 type Session = {
   userId: string;
@@ -148,6 +149,8 @@ export default function LiveApp({ session }: { session: Session }) {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
+  // The initial request synchronizes this shell with the server session.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(load, []);
   const visible = menu.filter(
     ([id]) =>
@@ -183,7 +186,7 @@ export default function LiveApp({ session }: { session: Session }) {
     if (tab === "harvest") return <HarvestPage refreshOverview={load} />;
     if (tab === "smart") return <SmartFarmPage />;
     if (tab === "report") return <ReportsPage />;
-    if (tab === "users") return <UsersPage />;
+    if (tab === "users") return <AdminUsersPage />;
     if (tab === "settings") return <SettingsPage saved={load} />;
     return null;
   }, [tab, data, farm, session]);
@@ -494,79 +497,6 @@ function MiniEmpty({ text }: { text: string }) {
     </div>
   );
 }
-function UsersPage() {
-  const [users, setUsers] = useState<
-      Array<{
-        id: string;
-        name: string;
-        username: string;
-        role: string;
-        isActive: number | boolean;
-      }>
-    >([]),
-    [loading, setLoading] = useState(true);
-  useEffect(() => {
-    fetch("/api/admin/users", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((x) => setUsers(x.users || []))
-      .finally(() => setLoading(false));
-  }, []);
-  return (
-    <>
-      <PageHead
-        eyebrow="ADMIN · LOCAL ACCOUNTS"
-        title="ผู้ใช้และสิทธิ์"
-        detail="บัญชีจริงที่สร้างโดย Admin ไม่ใช้อีเมลหรือบัญชี ChatGPT"
-      />
-      <div className="permission-overview">
-        <div>
-          <ShieldCheck />
-          <p>
-            <b>Admin ควบคุมระบบทั้งหมด</b>
-            <span>
-              การกำหนดสิทธิ์ละเอียดจะตรวจครบทั้งหน้าเว็บและเซิร์ฟเวอร์ใน P9
-            </span>
-          </p>
-        </div>
-        <span>{users.length} บัญชี</span>
-      </div>
-      <div className="user-table">
-        <div className="user-head">
-          <span>ผู้ใช้</span>
-          <span>บทบาท</span>
-          <span>สถานะ</span>
-          <span />
-          <span />
-        </div>
-        {loading ? (
-          <div className="mini-empty">
-            <Leaf />
-            กำลังโหลดผู้ใช้...
-          </div>
-        ) : (
-          users.map((u) => (
-            <div className="user-row" key={u.id}>
-              <span>
-                <i>{u.name.slice(0, 2)}</i>
-                <b>
-                  {u.name}
-                  <small>@{u.username}</small>
-                </b>
-              </span>
-              <span>{u.role === "admin" ? "Admin" : "User"}</span>
-              <em className={u.isActive ? "good" : "pending"}>
-                {u.isActive ? "ใช้งาน" : "ระงับ"}
-              </em>
-              <span />
-              <button disabled>🔒</button>
-            </div>
-          ))
-        )}
-      </div>
-    </>
-  );
-}
-
 type SettingsForm = {
   farmName: string;
   address: string;
