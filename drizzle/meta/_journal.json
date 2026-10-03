@@ -85,6 +85,13 @@
       "when": 1790907437761,
       "tag": "0011_fine_the_watchers",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791037850902,
+      "tag": "0012_flawless_mongoose",
+      "breakpoints": true
     }
   ]
 }

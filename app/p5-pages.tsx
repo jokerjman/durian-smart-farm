@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import "./p5.css";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -26,8 +27,12 @@ type Product = {
   registrationNo: string | null;
   packageSize: number | null;
   packageUnit: string | null;
+  packageCountUnit: string | null;
   defaultRatePer200l: number | null;
   rateUnit: string | null;
+  defaultCropStage: string | null;
+  defaultTargetIssue: string | null;
+  phiDays: number | null;
   unit: string;
   minimumStock: number;
   stock: number;
@@ -79,13 +84,58 @@ type Line = {
   packageQty: number;
   packageSize: number;
   packageUnit: string;
+  packageCountUnit: string;
   unitPrice: number;
+  discount: number;
   lotNo: string;
   expiresOn: string;
   ratePer200l: number;
   rateUnit: string;
   minimumStock: number;
+  cropStage: string;
+  targetIssue: string;
+  phiDays: number;
 };
+const PRODUCT_KINDS = [
+    "ปุ๋ยเม็ด",
+    "ปุ๋ยเกล็ด/ใบ",
+    "สารกำจัดแมลง",
+    "สารกำจัดเชื้อรา",
+    "ฮอร์โมน/สารเสริม",
+    "ธาตุอาหารรอง/เสริม",
+    "สารจับใบ",
+    "วัสดุสิ้นเปลือง",
+    "อื่นๆ",
+  ],
+  PACKAGE_COUNT_UNITS = ["ถุง", "กระสอบ", "ขวด", "แกลลอน", "ซอง", "ลัง", "กล่อง", "ชิ้น"],
+  QUANTITY_UNITS = ["กก.", "กรัม", "ลิตร", "มล.", "ชิ้น"],
+  CROP_STAGES = [
+    "ไม่ระบุ",
+    "ฟื้นฟูต้นหลังเก็บเกี่ยว",
+    "แตกใบอ่อน",
+    "ทำสาร/สะสมอาหาร",
+    "เริ่มออกดอก",
+    "ดอกบาน",
+    "ติดผล",
+    "ระยะผลอ่อน",
+    "ขยายผล",
+    "ทำหวานก่อนตัด",
+  ],
+  TARGET_ISSUES = [
+    "ไม่ระบุ",
+    "บำรุงต้นและใบ",
+    "สะสมอาหาร/สร้างตาดอก",
+    "บำรุงดอกและการติดผล",
+    "บำรุงและขยายผล",
+    "ป้องกันเพลี้ยไก่แจ้",
+    "ป้องกันหนอนเจาะผล",
+    "ป้องกันไรแดง",
+    "ป้องกันโรครากเน่าโคนเน่า",
+    "รักษาโรคราใบติด",
+    "ฟื้นฟูต้นหลังเก็บเกี่ยว",
+    "อื่นๆ",
+  ],
+  PHI_OPTIONS = ["0|ไม่กำหนด/ไม่ใช่สารเคมี", "1|1 วัน", "3|3 วัน", "7|7 วัน", "14|14 วัน", "21|21 วัน", "30|30 วัน"];
 const api = async (url: string, init?: RequestInit) => {
   const r = await fetch(url, init),
     x = await r.json();
@@ -102,7 +152,7 @@ const money = (n: number) =>
     productId: "",
     sku: "",
     name: "",
-    kind: "ยา/สาร",
+    kind: "สารกำจัดแมลง",
     brand: "",
     commonName: "",
     formulation: "",
@@ -110,12 +160,17 @@ const money = (n: number) =>
     packageQty: 1,
     packageSize: 1,
     packageUnit: "มล.",
+    packageCountUnit: "ขวด",
     unitPrice: 0,
+    discount: 0,
     lotNo: "",
     expiresOn: "",
     ratePer200l: 0,
     rateUnit: "มล.",
     minimumStock: 0,
+    cropStage: "ไม่ระบุ",
+    targetIssue: "ไม่ระบุ",
+    phiDays: 0,
   });
 
 export function InventoryPage({
@@ -146,7 +201,9 @@ export function InventoryPage({
       .catch((e) => setMessage(e.message))
       .finally(() => setLoading(false));
   };
+  // The initial request synchronizes inventory state with D1.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, []);
   const saved = (m: string) => {
@@ -567,27 +624,19 @@ function ProductModal({
         />
         <Field label="ชื่อสินค้า" value={f.name} set={(v) => set("name", v)} />
         <Select
-          label="ประเภท"
+          label="หมวดหมู่สินค้า"
           value={f.kind}
           set={(v) => set("kind", v)}
-          options={[
-            "ยา/สาร",
-            "ฮอร์โมน",
-            "ปุ๋ย",
-            "ธาตุอาหาร",
-            "สารจับใบ",
-            "วัสดุสิ้นเปลือง",
-            "อื่นๆ",
-          ]}
+          options={PRODUCT_KINDS}
         />
-        <Field label="ยี่ห้อ" value={f.brand} set={(v) => set("brand", v)} />
+        <Field label="ชื่อทางการค้า/ยี่ห้อ" value={f.brand} set={(v) => set("brand", v)} />
         <Field
-          label="ชื่อสามัญ"
+          label="ชื่อสามัญ/สารสำคัญ"
           value={f.commonName}
           set={(v) => set("commonName", v)}
         />
         <Field
-          label="สูตร/ความเข้มข้น"
+          label="สูตรเคมี/% ความเข้มข้น"
           value={f.formulation}
           set={(v) => set("formulation", v)}
         />
@@ -602,13 +651,20 @@ function ProductModal({
           value={f.packageSize}
           set={(v) => set("packageSize", Number(v))}
         />
-        <Field
+        <Select
+          label="หน่วยบรรจุภัณฑ์"
+          value={f.packageCountUnit}
+          set={(v) => set("packageCountUnit", v)}
+          options={PACKAGE_COUNT_UNITS}
+        />
+        <Select
           label="หน่วยปริมาณ/สต๊อก"
           value={f.packageUnit}
           set={(v) => {
             set("packageUnit", v);
             set("unit", v);
           }}
+          options={QUANTITY_UNITS}
         />
         <Field
           label="อัตราปกติ / 200 ลิตร"
@@ -626,6 +682,24 @@ function ProductModal({
           type="number"
           value={f.minimumStock}
           set={(v) => set("minimumStock", Number(v))}
+        />
+        <Select
+          label="ระยะการเจริญเติบโตที่ใช้บ่อย"
+          value={f.cropStage}
+          set={(v) => set("cropStage", v)}
+          options={CROP_STAGES}
+        />
+        <Select
+          label="เป้าหมายการใช้งานที่ใช้บ่อย"
+          value={f.targetIssue}
+          set={(v) => set("targetIssue", v)}
+          options={TARGET_ISSUES}
+        />
+        <Select
+          label="ระยะปลอดภัยก่อนเก็บเกี่ยว (PHI)"
+          value={String(f.phiDays)}
+          set={(v) => set("phiDays", Number(v))}
+          options={PHI_OPTIONS}
         />
       </div>
       {error && <ErrorText text={error} />}
@@ -679,15 +753,24 @@ function PurchaseModal({
               registrationNo: p.registrationNo || "",
               packageSize: Number(p.packageSize) || 1,
               packageUnit: p.packageUnit || p.unit,
+              packageCountUnit: p.packageCountUnit || "ขวด",
               unitPrice: Number(p.lastUnitPrice) || 0,
               ratePer200l: Number(p.defaultRatePer200l) || 0,
               rateUnit: p.rateUnit || p.unit,
+              cropStage: p.defaultCropStage || "ไม่ระบุ",
+              targetIssue: p.defaultTargetIssue || "ไม่ระบุ",
+              phiDays: Number(p.phiDays) || 0,
             }
           : r,
       ),
     );
   };
-  const subtotal = lines.reduce((n, x) => n + x.packageQty * x.unitPrice, 0);
+  const subtotal = lines.reduce((n, x) => n + x.packageQty * x.unitPrice, 0),
+    lineDiscount = lines.reduce(
+      (n, x) => n + Math.min(x.packageQty * x.unitPrice, x.discount),
+      0,
+    ),
+    netBeforeBillDiscount = subtotal - lineDiscount;
   const file = (f?: File) => {
     if (!f) return;
     if (f.size > 350000) {
@@ -733,8 +816,8 @@ function PurchaseModal({
         <Field label="วันที่ซื้อ" type="date" value={date} set={setDate} />
       </div>
       <div className="purchase-help">
-        <Check /> เลือกสินค้าที่ซื้อประจำ ระบบเติมรายละเอียดให้เอง
-        กรอกเพียงจำนวน ราคา และ Lot
+        <Check /> เลือกสินค้าที่ซื้อประจำ ระบบเติมหมวด ยี่ห้อ สูตร ขนาดบรรจุ
+        และข้อมูล GAP ให้เอง
       </div>
       {lines.map((x, i) => (
         <section className="p5-line" key={i}>
@@ -764,6 +847,10 @@ function PurchaseModal({
             </select>
           </label>
           <div className="p5-line-grid">
+            <div className="p5-line-section">
+              <b>รายละเอียดสินค้า</b>
+              <span>ระบุให้ตรงกับฉลาก เพื่อป้องกันการซื้อหรือรับสินค้าผิดกลุ่ม</span>
+            </div>
             <Field
               label="รหัส"
               value={x.sku}
@@ -775,39 +862,42 @@ function PurchaseModal({
               set={(v) => update(i, "name", v)}
             />
             <Select
-              label="ประเภท"
+              label="หมวดหมู่สินค้า"
               value={x.kind}
               set={(v) => update(i, "kind", v)}
-              options={[
-                "ยา/สาร",
-                "ฮอร์โมน",
-                "ปุ๋ย",
-                "ธาตุอาหาร",
-                "สารจับใบ",
-                "วัสดุสิ้นเปลือง",
-                "อื่นๆ",
-              ]}
+              options={PRODUCT_KINDS}
             />
             <Field
-              label="ยี่ห้อ"
+              label="ชื่อทางการค้า/ยี่ห้อ"
               value={x.brand}
               set={(v) => update(i, "brand", v)}
             />
             <Field
-              label="ชื่อสามัญ"
+              label="ชื่อสามัญ/สารสำคัญ"
               value={x.commonName}
               set={(v) => update(i, "commonName", v)}
             />
             <Field
-              label="สูตร/ความเข้มข้น"
+              label="สูตรเคมี/% ความเข้มข้น"
               value={x.formulation}
               set={(v) => update(i, "formulation", v)}
             />
             <Field
-              label="จำนวนบรรจุภัณฑ์"
+              label="เลขทะเบียน"
+              value={x.registrationNo}
+              set={(v) => update(i, "registrationNo", v)}
+            />
+            <Field
+              label={"จำนวนที่สั่ง (" + x.packageCountUnit + ")"}
               type="number"
               value={x.packageQty}
               set={(v) => update(i, "packageQty", Number(v))}
+            />
+            <Select
+              label="หน่วยนับ"
+              value={x.packageCountUnit}
+              set={(v) => update(i, "packageCountUnit", v)}
+              options={PACKAGE_COUNT_UNITS}
             />
             <Field
               label="ขนาดต่อหน่วย"
@@ -815,16 +905,23 @@ function PurchaseModal({
               value={x.packageSize}
               set={(v) => update(i, "packageSize", Number(v))}
             />
-            <Field
+            <Select
               label="หน่วยปริมาณ"
               value={x.packageUnit}
               set={(v) => update(i, "packageUnit", v)}
+              options={QUANTITY_UNITS}
             />
             <Field
-              label="ราคาต่อบรรจุภัณฑ์"
+              label={"ราคาต่อ" + x.packageCountUnit}
               type="number"
               value={x.unitPrice}
               set={(v) => update(i, "unitPrice", Number(v))}
+            />
+            <Field
+              label="ส่วนลดรายการนี้"
+              type="number"
+              value={x.discount}
+              set={(v) => update(i, "discount", Number(v))}
             />
             <Field
               label="เลข Lot"
@@ -837,10 +934,45 @@ function PurchaseModal({
               value={x.expiresOn}
               set={(v) => update(i, "expiresOn", v)}
             />
+            <Field
+              label="อัตราใช้ต่อถัง 200 ลิตร"
+              type="number"
+              value={x.ratePer200l}
+              set={(v) => update(i, "ratePer200l", Number(v))}
+            />
+            <Select
+              label="หน่วยอัตราใช้"
+              value={x.rateUnit}
+              set={(v) => update(i, "rateUnit", v)}
+              options={QUANTITY_UNITS}
+            />
+            <div className="p5-line-section agronomy">
+              <b>ข้อมูลกำกับสำหรับสวนทุเรียนและ GAP</b>
+              <span>ช่วยวางแผนการใช้สารและตรวจระยะปลอดภัยก่อนเก็บเกี่ยว</span>
+            </div>
+            <Select
+              label="ระยะการเจริญเติบโต"
+              value={x.cropStage}
+              set={(v) => update(i, "cropStage", v)}
+              options={CROP_STAGES}
+            />
+            <Select
+              label="เป้าหมายการใช้งาน"
+              value={x.targetIssue}
+              set={(v) => update(i, "targetIssue", v)}
+              options={TARGET_ISSUES}
+            />
+            <Select
+              label="ระยะปลอดภัยก่อนเก็บเกี่ยว (PHI)"
+              value={String(x.phiDays)}
+              set={(v) => update(i, "phiDays", Number(v))}
+              options={PHI_OPTIONS}
+            />
           </div>
           <p>
-            รับเข้า {(x.packageQty * x.packageSize).toLocaleString("th-TH")}{" "}
-            {x.packageUnit} <b>{money(x.packageQty * x.unitPrice)}</b>
+            รับเข้า {x.packageQty.toLocaleString("th-TH")} {x.packageCountUnit} ·{" "}
+            {(x.packageQty * x.packageSize).toLocaleString("th-TH")} {x.packageUnit}
+            <b>{money(Math.max(0, x.packageQty * x.unitPrice - x.discount))}</b>
           </p>
         </section>
       ))}
@@ -865,7 +997,7 @@ function PurchaseModal({
         </label>
         <div>
           <Field
-            label="ส่วนลด"
+            label="ส่วนลดท้ายบิล"
             type="number"
             value={discount}
             set={(v) => setDiscount(Number(v))}
@@ -873,8 +1005,14 @@ function PurchaseModal({
           <p>
             ยอดสินค้า <b>{money(subtotal)}</b>
           </p>
+          {lineDiscount > 0 && (
+            <p>
+              ส่วนลดรายสินค้า <b>-{money(lineDiscount)}</b>
+            </p>
+          )}
           <p className="grand">
-            สุทธิ <b>{money(Math.max(0, subtotal - discount))}</b>
+            สุทธิ{" "}
+            <b>{money(Math.max(0, netBeforeBillDiscount - discount))}</b>
           </p>
         </div>
       </div>

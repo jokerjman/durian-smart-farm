@@ -20,7 +20,7 @@ export async function GET() {
     permitPermission(s, "inventory.view");
     const products = await env
       .DB!.prepare(
-        `SELECT p.id,p.sku,p.name,p.kind,p.brand,p.common_name AS commonName,p.formulation,p.registration_no AS registrationNo,p.package_size AS packageSize,p.package_unit AS packageUnit,p.default_rate_per_200l AS defaultRatePer200l,p.rate_unit AS rateUnit,p.unit,p.minimum_stock AS minimumStock,p.active,COALESCE(SUM(l.remaining_qty),0) AS stock,COUNT(CASE WHEN l.remaining_qty>0 THEN 1 END) AS lotCount,MIN(CASE WHEN l.remaining_qty>0 THEN l.expires_on END) AS nearestExpiry,(SELECT pl.unit_price FROM purchase_lines pl JOIN purchase_receipts pr ON pr.id=pl.purchase_id WHERE pl.product_id=p.id ORDER BY pr.purchased_on DESC,pr.created_at DESC LIMIT 1) AS lastUnitPrice FROM products p LEFT JOIN stock_lots l ON l.product_id=p.id WHERE p.farm_id=? GROUP BY p.id ORDER BY p.active DESC,p.name`,
+        `SELECT p.id,p.sku,p.name,p.kind,p.brand,p.common_name AS commonName,p.formulation,p.registration_no AS registrationNo,p.package_size AS packageSize,p.package_unit AS packageUnit,p.package_count_unit AS packageCountUnit,p.default_rate_per_200l AS defaultRatePer200l,p.rate_unit AS rateUnit,p.default_crop_stage AS defaultCropStage,p.default_target_issue AS defaultTargetIssue,p.phi_days AS phiDays,p.unit,p.minimum_stock AS minimumStock,p.active,COALESCE(SUM(l.remaining_qty),0) AS stock,COUNT(CASE WHEN l.remaining_qty>0 THEN 1 END) AS lotCount,MIN(CASE WHEN l.remaining_qty>0 THEN l.expires_on END) AS nearestExpiry,(SELECT pl.unit_price FROM purchase_lines pl JOIN purchase_receipts pr ON pr.id=pl.purchase_id WHERE pl.product_id=p.id ORDER BY pr.purchased_on DESC,pr.created_at DESC LIMIT 1) AS lastUnitPrice FROM products p LEFT JOIN stock_lots l ON l.product_id=p.id WHERE p.farm_id=? GROUP BY p.id ORDER BY p.active DESC,p.name`,
       )
       .bind(s.farmId)
       .all();
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       try {
         await env
           .DB!.prepare(
-            "INSERT INTO products (id,farm_id,sku,name,kind,brand,common_name,formulation,registration_no,package_size,package_unit,default_rate_per_200l,rate_unit,unit,minimum_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO products (id,farm_id,sku,name,kind,brand,common_name,formulation,registration_no,package_size,package_unit,package_count_unit,default_rate_per_200l,rate_unit,default_crop_stage,default_target_issue,phi_days,unit,minimum_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
           )
           .bind(
             productId,
@@ -84,8 +84,12 @@ export async function POST(req: Request) {
             clean(b.registrationNo, 100) || null,
             num(b.packageSize) || null,
             clean(b.packageUnit, 30) || unit,
+            clean(b.packageCountUnit, 30) || "ชิ้น",
             num(b.defaultRatePer200l) || null,
             clean(b.rateUnit, 30) || null,
+            clean(b.cropStage, 100) || null,
+            clean(b.targetIssue, 180) || null,
+            Math.round(num(b.phiDays)),
             unit,
             num(b.minimumStock),
             1,

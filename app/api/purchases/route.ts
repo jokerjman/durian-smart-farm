@@ -19,12 +19,17 @@ type Line = {
   packageQty?: number;
   packageSize?: number;
   packageUnit?: string;
+  packageCountUnit?: string;
   unitPrice?: number;
+  discount?: number;
   lotNo?: string;
   expiresOn?: string;
   ratePer200l?: number;
   rateUnit?: string;
   minimumStock?: number;
+  cropStage?: string;
+  targetIssue?: string;
+  phiDays?: number;
 };
 const clean = (v: unknown, n = 180) =>
   String(v ?? "")
@@ -88,12 +93,25 @@ export async function POST(req: Request) {
       purchaseId = id("purchase"),
       transactionId = id("txn"),
       categoryId = `purchase_inputs_${s.farmId}`,
-      subtotal = lines.reduce(
+      grossSubtotal = lines.reduce(
         (n, x) => n + Number(x.packageQty) * Number(x.unitPrice),
         0,
       ),
-      discount = Math.min(subtotal, Math.max(0, Number(b.discount) || 0)),
-      total = subtotal - discount,
+      lineDiscount = lines.reduce(
+        (n, x) =>
+          n +
+          Math.min(
+            Number(x.packageQty) * Number(x.unitPrice),
+            Math.max(0, Number(x.discount) || 0),
+          ),
+        0,
+      ),
+      orderDiscount = Math.min(
+        grossSubtotal - lineDiscount,
+        Math.max(0, Number(b.discount) || 0),
+      ),
+      totalDiscount = lineDiscount + orderDiscount,
+      total = grossSubtotal - totalDiscount,
       purchasedOn =
         clean(b.purchasedOn, 10) || new Date().toISOString().slice(0, 10),
       season =
@@ -140,8 +158,8 @@ export async function POST(req: Request) {
           supplier,
           clean(b.invoiceNo, 100) || null,
           purchasedOn,
-          subtotal,
-          discount,
+          grossSubtotal,
+          totalDiscount,
           total,
           transactionId,
           receiptKey || null,
@@ -178,11 +196,16 @@ export async function POST(req: Request) {
         packageSize = Number(x.packageSize),
         receivedQty = packageQty * packageSize,
         unitPrice = Number(x.unitPrice),
-        unitCost = unitPrice / packageSize;
+        itemDiscount = Math.min(
+          packageQty * unitPrice,
+          Math.max(0, Number(x.discount) || 0),
+        ),
+        lineTotal = packageQty * unitPrice - itemDiscount,
+        unitCost = lineTotal / receivedQty;
       statements.push(
         env
           .DB!.prepare(
-            "INSERT INTO products (id,farm_id,sku,name,kind,brand,common_name,formulation,registration_no,package_size,package_unit,default_rate_per_200l,rate_unit,unit,minimum_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(farm_id,sku) DO UPDATE SET name=excluded.name,kind=excluded.kind,brand=excluded.brand,common_name=excluded.common_name,formulation=excluded.formulation,registration_no=excluded.registration_no,package_size=excluded.package_size,package_unit=excluded.package_unit,default_rate_per_200l=excluded.default_rate_per_200l,rate_unit=excluded.rate_unit,unit=excluded.unit,minimum_stock=excluded.minimum_stock,updated_at=excluded.updated_at",
+            "INSERT INTO products (id,farm_id,sku,name,kind,brand,common_name,formulation,registration_no,package_size,package_unit,package_count_unit,default_rate_per_200l,rate_unit,default_crop_stage,default_target_issue,phi_days,unit,minimum_stock,active,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(farm_id,sku) DO UPDATE SET name=excluded.name,kind=excluded.kind,brand=excluded.brand,common_name=excluded.common_name,formulation=excluded.formulation,registration_no=excluded.registration_no,package_size=excluded.package_size,package_unit=excluded.package_unit,package_count_unit=excluded.package_count_unit,default_rate_per_200l=excluded.default_rate_per_200l,rate_unit=excluded.rate_unit,default_crop_stage=excluded.default_crop_stage,default_target_issue=excluded.default_target_issue,phi_days=excluded.phi_days,unit=excluded.unit,minimum_stock=excluded.minimum_stock,updated_at=excluded.updated_at",
           )
           .bind(
             productId,
@@ -196,8 +219,12 @@ export async function POST(req: Request) {
             clean(x.registrationNo, 100) || null,
             packageSize,
             clean(x.packageUnit, 30) || "หน่วย",
+            clean(x.packageCountUnit, 30) || "ชิ้น",
             Number(x.ratePer200l) || null,
             clean(x.rateUnit, 30) || null,
+            clean(x.cropStage, 100) || null,
+            clean(x.targetIssue) || null,
+            Math.round(Math.max(0, Number(x.phiDays) || 0)),
             clean(x.packageUnit, 30) || "หน่วย",
             Math.max(0, Number(x.minimumStock) || 0),
             1,
@@ -222,7 +249,7 @@ export async function POST(req: Request) {
           ),
         env
           .DB!.prepare(
-            "INSERT INTO purchase_lines (id,purchase_id,product_id,lot_id,package_qty,package_size,package_unit,unit_price,line_total) VALUES (?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO purchase_lines (id,purchase_id,product_id,lot_id,package_qty,package_size,package_unit,package_count_unit,unit_price,discount,line_total,item_kind,trade_name,common_name,formulation,crop_stage,target_issue,phi_days) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
           )
           .bind(
             id("purchase_line"),
@@ -232,8 +259,17 @@ export async function POST(req: Request) {
             packageQty,
             packageSize,
             clean(x.packageUnit, 30) || "หน่วย",
+            clean(x.packageCountUnit, 30) || "ชิ้น",
             unitPrice,
-            packageQty * unitPrice,
+            itemDiscount,
+            lineTotal,
+            clean(x.kind, 60) || "อื่นๆ",
+            clean(x.brand, 120) || clean(x.name),
+            clean(x.commonName) || null,
+            clean(x.formulation, 100) || null,
+            clean(x.cropStage, 100) || null,
+            clean(x.targetIssue) || null,
+            Math.round(Math.max(0, Number(x.phiDays) || 0)),
           ),
         env
           .DB!.prepare(
